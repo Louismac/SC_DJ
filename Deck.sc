@@ -1,6 +1,6 @@
 Deck {
 classvar s;	
-var <>bus,<>track,startstopBool,cuePos,fwdRoutine,bwdRoutine,slowRoutine,ref,fineTune=0,param,files,onetouch;
+var <>bus,<>track,isStopped,cuePos,fwdRoutine,bwdRoutine,slowRoutine,ref,fineTune=0,param,files,ignoreOff;
 
 *new {arg refNo;
 ^super.new.initDeck(refNo);	
@@ -14,43 +14,43 @@ initDeck {arg refNo;
 		this.resetAutoLoad;
 	}.fork;
 	ref=refNo;
-	startstopBool=true;
+	isStopped=true;
 	cuePos=0;
 	param=[1,1,1,1];
-	//onetouch buttons ignore the MIDI off event 
-	onetouch=Array.fill(6,{true});
+	//ignoreOff buttons ignore the MIDI off event 
+	ignoreOff=Array.fill(6,{true});
 }	
 
 resetAutoLoad {
 	var path,index=0;
-	if(onetouch[index],{
+	if(ignoreOff[index],{
 		path=PathName("/Users/LouisMcc/Music/djing/sc/"++ref);
 		files=path.files;
 		for(0,files.size-1,{arg i;
 			files[i].fullPath.postln;
 			})
 		;
-		onetouch[index]=false;
-	},{onetouch[index]=true});
+		ignoreOff[index]=false;
+	},{ignoreOff[index]=true});
 }
 
  loadTrack {arg path;
 	["PATH",path].postln;
 	if(track!=nil,{track.loadedBuffer.free});
-	if(startstopBool==false,{track.stop});	
+	if(isStopped==false,{track.stop;isStopped=true});	
 	cuePos=0;
 	track=Track.new(path,bus,ref);
 }
 
 loadNextTrack {
 	var index=3;
-	if(onetouch[index],{
+	if(ignoreOff[index],{
 		if(files.size>0) {
 			this.loadTrack(files[0].fullPath);
 			files.removeAt(0);
 		};
-		onetouch[index]=false;
-	},{onetouch[index]=true});
+		ignoreOff[index]=false;
+	},{ignoreOff[index]=true});
 }
 
 getVals {
@@ -65,11 +65,11 @@ getVals {
 
 setCue {arg val;
 	var index=5;
-	if(onetouch,{
+	if(ignoreOff[index],{
 		if(val==true,{cuePos=track.pos},{cuePos=0});
 		fineTune=0;
-		onetouch[index]=false;
-	},{onetouch[index]=true});
+		ignoreOff[index]=false;
+	},{ignoreOff[index]=true});
 }
 
 fineTuneCue {arg val;
@@ -121,7 +121,7 @@ stopSkip {
 
 powerDown{
 	var dur,index=2;
-	if(onetouch[index],{
+	if(ignoreOff[index],{
 		dur=0.8;
 		{
 			{256.do{arg i;
@@ -131,8 +131,8 @@ powerDown{
 			dur.wait;
 			this.startstop;	
 		}.fork;
-		onetouch[index]=false;
-	},{onetouch[index]=true});
+		ignoreOff[index]=false;
+	},{ignoreOff[index]=true});
 	
 }
 
@@ -162,26 +162,29 @@ setCutRate {arg val;
 
 setToCuePos {
 	var index=4;
-	if(onetouch[index],{
+	if(ignoreOff[index],{
+		//Needs 4 to get past ignoreOff (on/off/on/off)
 		this.startstop;
 		this.startstop;
-		onetouch[index]=false;
-	},{onetouch[index]=true});
+		this.startstop;
+		this.startstop;
+		ignoreOff[index]=false;
+	},{ignoreOff[index]=true});
 }
 
 startstop {
 	var index=1;
-	if(onetouch[index],{
-		if(startstopBool) {
+	if(ignoreOff[index],{
+		if(isStopped, {
 			track.postln;
 			track.play(cuePos+fineTune);
-			startstopBool=false
-		} {
+			isStopped=false;
+		},{
 		 	track.stop;
-			startstopBool=true;
-		};
-		onetouch[index]=false;
-	},{onetouch[index]=true});
+			isStopped=true;
+		});
+		ignoreOff[index]=false;
+	},{ignoreOff[index]=true});
 }
 
 updatePitch {arg val;

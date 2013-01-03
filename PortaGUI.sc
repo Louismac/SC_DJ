@@ -1,8 +1,10 @@
 PortaGUI {
 classvar s;
-var mixer,decks,window,dragBox,loadButton,posBox,trigBox,rateBox,cueBox,volBar,volResponder,volBarVals,mainMix,labels;
+var mixer,decks,window;
+var dragBox, posBox,trigBox,rateBox,cueBox;
+var volBar,volResponder,volBarVals,mainMix,labels;
 
-*new {arg m,d;
+*new {arg m,d,mi;
 ^super.new.initPortaGUI(m,d);	
 }	
 
@@ -14,7 +16,6 @@ initPortaGUI {arg m,d;
 	window.front;
 	window.alwaysOnTop_(true);
 	dragBox=List.new(0);
-	loadButton=List.new(0);
 	posBox=List.new(0);
 	rateBox=List.new(0);
 	trigBox=List.new(0);
@@ -31,15 +32,6 @@ initPortaGUI {arg m,d;
 
 	{2.do{arg i;
 		dragBox.add(SCTextView.new(window,Rect(75+(260*i), 20, 100,20)));
-		// loadButton.add(SCButton.new(window,Rect(75+(260*i),60,100,20)));
-		// loadButton[i].states_([ 
-		// 	[ "LOAD", Color(1.0, 1.0, 1.0, 1.0), Color(0.0, 0.0, 0.0, 1.0) ]
-		// ]);
-		// loadButton[i].action_({
-			// dragBox[i].string[1..dragBox[i].string.size-2].postln;
-			// decks[i].loadTrack(dragBox[i].string[1..dragBox[i].string.size-2]);
-			// dragBox[i].string_("");
-		// });
 		posBox.add(SCNumberBox.new(window, Rect(100+(260*i),100,50,20)));
 		rateBox.add(SCNumberBox.new(window, Rect(100+(260*i),220,50,20)));
 	    trigBox.add(SCNumberBox.new(window, Rect(100+(260*i),180,50,20)));

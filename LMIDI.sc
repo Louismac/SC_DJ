@@ -1,6 +1,6 @@
 LMIDI {
 
-var mixer,decks,category,controls,file,fileReader,learning;
+var mixer,decks,category,controls,file,fileReader,toLearn;
 
 *new {arg m,d;
 ^super.new.initLMIDI(m,d);	
@@ -45,30 +45,30 @@ initLMIDI {arg m,d;
 launchGUI {
 	var win,btns,width=480,height=640,along=3,down=20;
 	btns=();
-	learning=nil;
+	toLearn=nil;
 	win=SCWindow.new("",Rect(0,0,width,height)).front;
 	controls.do{arg item,i;
 		btns[item[\name].asSymbol]=Button(win,Rect(item[\left]*(width/along),item[\top]*(height/down),width/along,height/down))
 		.states_([
 			[item[\label]++"\n"++"Midi note "++item[\responder].matchEvent.note,Color.yellow,Color.black],	
-			["Learning",Color.black,Color.yellow]
+			["Press MIDI to Learn",Color.black,Color.yellow]
 		])
 		.action_({
 			item[\responder].matchEvent.note.postln;
-			if(learning!=nil, {
-				if(learning!=item[\name], {
-					btns[learning.asSymbol].value_(0);
-					learning=item[\name];
+			if(toLearn!=nil, {
+				if(toLearn!=item[\name], {
+					btns[toLearn.asSymbol].value_(0);
+					toLearn=item[\name];
 				},{
-					"learning=nil".postln;
-					learning=nil;
+					"toLearn=nil".postln;
+					toLearn=nil;
 					btns[item[\name].asSymbol].states_([
 						[item[\label]++"\n"++"Midi note "++item[\responder].matchEvent.note,Color.yellow,Color.black],	
-						["Learning",Color.black,Color.yellow]
+						["Press MIDI to Learn",Color.black,Color.yellow]
 					])
 				});
 			},{
-				learning=item[\name];
+				toLearn=item[\name];
 			});
 		});
 	};
@@ -77,13 +77,13 @@ launchGUI {
 	.action_({this.saveMap});
 	
 	CCResponder({arg src,chan,num,vel;
-		if(learning!=nil, {
+		if(toLearn!=nil, {
 			num.postln;
 			try{
-				controls[learning.asSymbol][\responder].remove;
-				controls[learning.asSymbol][\responder]=
-					CCResponder(controls[learning.asSymbol][\function],nil,chan,num,nil);
-				Task({1.do{{btns[learning.asSymbol].valueAction_(0)}.defer}},AppClock).play;
+				controls[toLearn.asSymbol][\responder].remove;
+				controls[toLearn.asSymbol][\responder]=
+					CCResponder(controls[toLearn.asSymbol][\function],nil,chan,num,nil);
+				Task({1.do{{btns[toLearn.asSymbol].valueAction_(0)}.defer}},AppClock).play;
 			} {arg error;
 				error.postln;
 			}
@@ -107,10 +107,9 @@ loadMap {
 	LMIDI.killKeys;
 	for(0,loadedMap.size-1,{arg i;
 		loadedMap[i].postln;
-		//controls[loadedMap[i][0].asSymbol][\responder]=(MIDIEvent(nil,nil,loadedMap[i][2],loadedMap[i][1],nil));
 		controls[loadedMap[i][0].asSymbol][\responder]=
 			CCResponder({arg src,chan,num,vel;
-				if(learning==nil,{
+				if(toLearn==nil,{
 					controls[loadedMap[i][0].asSymbol][\function].value(src,chan,num,vel);
 				});
 				},
