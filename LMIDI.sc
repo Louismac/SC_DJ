@@ -50,7 +50,7 @@ launchGUI {
 	controls.do{arg item,i;
 		btns[item[\name].asSymbol]=Button(win,Rect(item[\left]*(width/along),item[\top]*(height/down),width/along,height/down))
 		.states_([
-			[item[\label]++"\n"++item[\responder].matchEvent.note,Color.yellow,Color.black],	
+			[item[\label]++"\n"++"Midi note "++item[\responder].matchEvent.note,Color.yellow,Color.black],	
 			["Learning",Color.black,Color.yellow]
 		])
 		.action_({
@@ -63,7 +63,7 @@ launchGUI {
 					"learning=nil".postln;
 					learning=nil;
 					btns[item[\name].asSymbol].states_([
-						[item[\label]++"\n"++item[\responder].matchEvent.note,Color.yellow,Color.black],	
+						[item[\label]++"\n"++"Midi note "++item[\responder].matchEvent.note,Color.yellow,Color.black],	
 						["Learning",Color.black,Color.yellow]
 					])
 				});
@@ -75,6 +75,7 @@ launchGUI {
 	btns[\save]=Button(win,Rect(2*(width/along),0*(height/down),width/along,height/down))
 	.states_([["SAVE MAP",Color.red,Color.black]])
 	.action_({this.saveMap});
+	
 	CCResponder({arg src,chan,num,vel;
 		if(learning!=nil, {
 			num.postln;
@@ -108,7 +109,12 @@ loadMap {
 		loadedMap[i].postln;
 		//controls[loadedMap[i][0].asSymbol][\responder]=(MIDIEvent(nil,nil,loadedMap[i][2],loadedMap[i][1],nil));
 		controls[loadedMap[i][0].asSymbol][\responder]=
-			CCResponder({loadedMap[i].postln},nil,loadedMap[i][2].asInteger,loadedMap[i][1].asInteger,nil);
+			CCResponder({arg src,chan,num,vel;
+				if(learning==nil,{
+					controls[loadedMap[i][0].asSymbol][\function].value(src,chan,num,vel);
+				});
+				},
+				nil,loadedMap[i][2].asInteger,loadedMap[i][1].asInteger,nil);
 	});
 }
 
