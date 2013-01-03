@@ -1,6 +1,6 @@
 LMIDI {
 
-var mixer,decks,category,controls,file,fileReader;
+var mixer,decks,category,controls,file,fileReader,learning;
 
 *new {arg m,d;
 ^super.new.initLMIDI(m,d);	
@@ -10,8 +10,7 @@ initLMIDI {arg m,d;
 	mixer=m;
 	decks=d;
 	LMIDI.startMIDI;
-	controls=();
-	this.mapKeys;
+	this.initDictionary;
 	this.loadMap;
 	this.launchGUI;
 }
@@ -44,22 +43,51 @@ initLMIDI {arg m,d;
 }
 
 launchGUI {
-	var win,btns,width=480,height=640,along=4,down=10;
+	var win,btns,width=480,height=640,along=3,down=20;
 	btns=();
+	learning=nil;
 	win=SCWindow.new("",Rect(0,0,width,height)).front;
 	controls.do{arg item,i;
-		btns[item[\name].asSymbol]=Button(win,Rect((i%down)*(width/down),((i/down).floor)*(height/along),width/down,height/along))
-		.states_([[item[\name]++"\n"++item[\responder].matchEvent.note,Color.yellow,Color.black]])
+		btns[item[\name].asSymbol]=Button(win,Rect(item[\left]*(width/along),item[\top]*(height/down),width/along,height/down))
+		.states_([
+			[item[\label]++"\n"++item[\responder].matchEvent.note,Color.yellow,Color.black],	
+			["Learning",Color.black,Color.yellow]
+		])
 		.action_({
-			item[\responder].learn;
-			item[\name]++"\n"++item[\responder].matchEvent.note.postln;
-			btns[item[\name].asSymbol].states_(
-				[[item[\name]++"\n"++item[\responder].matchEvent.note,Color.yellow,Color.black]])
+			item[\responder].matchEvent.note.postln;
+			if(learning!=nil, {
+				if(learning!=item[\name], {
+					btns[learning.asSymbol].value_(0);
+					learning=item[\name];
+				},{
+					"learning=nil".postln;
+					learning=nil;
+					btns[item[\name].asSymbol].states_([
+						[item[\label]++"\n"++item[\responder].matchEvent.note,Color.yellow,Color.black],	
+						["Learning",Color.black,Color.yellow]
+					])
+				});
+			},{
+				learning=item[\name];
 			});
+		});
 	};
-	btns[\save]=Button(win,Rect((width/down)*(down-1),(height/along)*(along-1),width/down,height/along))
+	btns[\save]=Button(win,Rect(2*(width/along),0*(height/down),width/along,height/down))
 	.states_([["SAVE MAP",Color.red,Color.black]])
 	.action_({this.saveMap});
+	CCResponder({arg src,chan,num,vel;
+		if(learning!=nil, {
+			num.postln;
+			try{
+				controls[learning.asSymbol][\responder].remove;
+				controls[learning.asSymbol][\responder]=
+					CCResponder(controls[learning.asSymbol][\function],nil,chan,num,nil);
+				Task({1.do{{btns[learning.asSymbol].valueAction_(0)}.defer}},AppClock).play;
+			} {arg error;
+				error.postln;
+			}
+		});
+		},nil,nil,nil,nil);
 }
 
 saveMap {
@@ -75,149 +103,191 @@ saveMap {
 
 loadMap {
  	var loadedMap=FileReader.read("DJMIDIMAP.dj");
+	LMIDI.killKeys;
 	for(0,loadedMap.size-1,{arg i;
 		loadedMap[i].postln;
-		controls[loadedMap[i][0].asSymbol][\responder].matchEvent=(MIDIEvent(nil,nil,loadedMap[i][2],loadedMap[i][1],nil));
+		//controls[loadedMap[i][0].asSymbol][\responder]=(MIDIEvent(nil,nil,loadedMap[i][2],loadedMap[i][1],nil));
+		controls[loadedMap[i][0].asSymbol][\responder]=
+			CCResponder({loadedMap[i].postln},nil,loadedMap[i][2].asInteger,loadedMap[i][1].asInteger,nil);
 	});
 }
 
-mapKeys {
+initDictionary {
+	controls=();
 	//main xfade(-1 to 1)
-	controls.postln;
 	controls[\mainxfade]=();
 	controls[\mainxfade][\name]="mainxfade";
-	controls[\mainxfade][\index]=0;
-	controls[\mainxfade][\responder]=
-		CCResponder({arg src,chan,num,vel;mixer.updateMix((vel/63.5)-1)},nil,0,[6,52],nil);
+	controls[\mainxfade][\label]="Main Crossfader";
+	controls[\mainxfade][\top]=0;
+	controls[\mainxfade][\left]=1;
+	controls[\mainxfade][\function]={arg src,chan,num,vel;mixer.updateMix((vel/63.5)-1)};
 	//cue xfade(-1 to 1)
 	controls[\cuexfade]=();
 	controls[\cuexfade][\name]="cuexfade";
-	controls[\cuexfade][\index]=1;
-	controls[\cuexfade][\responder]=
-		CCResponder({arg src,chan,num,vel;mixer.updateCueMix((vel/63.5)-1)},nil,0,[18,61],nil);
+	controls[\cuexfade][\label]="Cue Crossfader";
+	controls[\cuexfade][\top]=1;
+	controls[\cuexfade][\left]=1;
+	controls[\cuexfade][\function]={arg src,chan,num,vel;mixer.updateCueMix((vel/63.5)-1)};
 	//Reset auto load
 	controls[\resetload]=();
 	controls[\resetload][\name]="resetload";
-	controls[\resetload][\index]=2;
-	controls[\resetload][\responder]=
-		CCResponder({arg src,chan,num,vel;decks[0].resetAutoLoad;decks[1].resetAutoLoad},nil,0,27,nil);
+	controls[\resetload][\label]="Reset Auto Load Queue";
+	controls[\resetload][\top]=5;
+	controls[\resetload][\left]=1;
+	controls[\resetload][\function]={arg src,chan,num,vel;decks[0].resetAutoLoad;decks[1].resetAutoLoad};
 	2.do{arg i;
 	// pitch
 	controls[("pitch"++i).asSymbol]=();
 	controls[("pitch"++i).asSymbol][\name]="pitch"++i;
-	controls[("pitch"++i).asSymbol][\responder]=
-		CCResponder({arg src,chan,num,vel;decks[i].updatePitch(0.9+(vel/635))},nil,0,2+(i*5),nil);
+	controls[("pitch"++i).asSymbol][\label]="Pitch (Chan "++(i+1)++")";
+	controls[("pitch"++i).asSymbol][\top]=2;
+	controls[("pitch"++i).asSymbol][\left]=i*2;
+	controls[("pitch"++i).asSymbol][\function]={arg src,chan,num,vel;decks[i].updatePitch(0.9+(vel/635))};
 	// start/stop
 	controls[("startStop"++i).asSymbol]=();
 	controls[("startStop"++i).asSymbol][\name]="startStop"++i;
-	controls[("startStop"++i).asSymbol][\responder]=
-		CCResponder({arg src,chan,num,vel;decks[i].startstop;},nil,0,23+(i*5),nil);
+	controls[("startStop"++i).asSymbol][\label]="Start/Stop (Chan "++(i+1)++")";
+	controls[("startStop"++i).asSymbol][\top]=3;
+	controls[("startStop"++i).asSymbol][\left]=i*2;
+	controls[("startStop"++i).asSymbol][\function]={arg src,chan,num,vel;decks[i].startstop;};
 	// powerdown stop
 	controls[("powerdown"++i).asSymbol]=();
 	controls[("powerdown"++i).asSymbol][\name]="powerdown"++i;
-	controls[("powerdown"++i).asSymbol][\responder]=
-		CCResponder({arg src,chan,num,vel;decks[i].powerDown;},nil,0,36+(i*5),nil);
+	controls[("powerdown"++i).asSymbol][\label]="Deck Powerdown (Chan "++(i+1)++")";
+	controls[("powerdown"++i).asSymbol][\top]=4;
+	controls[("powerdown"++i).asSymbol][\left]=i*2;
+	controls[("powerdown"++i).asSymbol][\function]={arg src,chan,num,vel;decks[i].powerDown;};
 	// next track
 	controls[("nexttrack"++i).asSymbol]=();
 	controls[("nexttrack"++i).asSymbol][\name]="nexttrack"++i;
-	controls[("nexttrack"++i).asSymbol][\responder]=
-		CCResponder({arg src,chan,num,vel;decks[i].loadNextTrack;},nil,0,35+(i*5),nil);
+	controls[("nexttrack"++i).asSymbol][\label]="Load Next Track (Chan "++(i+1)++")";
+	controls[("nexttrack"++i).asSymbol][\top]=5;
+	controls[("nexttrack"++i).asSymbol][\left]=i*2;
+	controls[("nexttrack"++i).asSymbol][\function]={arg src,chan,num,vel;decks[i].loadNextTrack;};
 	// set pos to cue
 	controls[("setToCuePos"++i).asSymbol]=();
 	controls[("setToCuePos"++i).asSymbol][\name]="setToCuePos"++i;
-	controls[("setToCuePos"++i).asSymbol][\responder]=
-		CCResponder({arg src,chan,num,vel;decks[i].setToCuePos;},nil,0,33+(i*5),nil);
+	controls[("setToCuePos"++i).asSymbol][\label]="Move To Cue (Chan "++(i+1)++")";
+	controls[("setToCuePos"++i).asSymbol][\top]=6;
+	controls[("setToCuePos"++i).asSymbol][\left]=i*2;
+	controls[("setToCuePos"++i).asSymbol][\function]={arg src,chan,num,vel;decks[i].setToCuePos;};
 	// cue set
 	controls[("setCue"++i).asSymbol]=();
 	controls[("setCue"++i).asSymbol][\name]="setCue"++i;
-	controls[("setCue"++i).asSymbol][\responder]=
-		CCResponder({arg src,chan,num,vel;decks[i].setCue(true)},nil,0,24+(i*5),nil);
+	controls[("setCue"++i).asSymbol][\label]="Set Cue Position (Chan "++(i+1)++")";
+	controls[("setCue"++i).asSymbol][\top]=7;
+	controls[("setCue"++i).asSymbol][\left]=i*2;
+	controls[("setCue"++i).asSymbol][\function]={arg src,chan,num,vel;decks[i].setCue(true)};
 	// fine tune cue
 	controls[("fineTuneCue"++i).asSymbol]=();
 	controls[("fineTuneCue"++i).asSymbol][\name]="fineTuneCue"++i;
-	controls[("fineTuneCue"++i).asSymbol][\responder]=
-		CCResponder({arg src,chan,num,vel;decks[i].fineTuneCue(vel-63.5)},nil,0,14+(i*5),nil);
+	controls[("fineTuneCue"++i).asSymbol][\label]="Tweek Cue Pos (Chan "++(i+1)++")";
+	controls[("fineTuneCue"++i).asSymbol][\top]=8;
+	controls[("fineTuneCue"++i).asSymbol][\left]=i*2;
+	controls[("fineTuneCue"++i).asSymbol][\function]={arg src,chan,num,vel;decks[i].fineTuneCue(vel-63.5)};
 	// cue set 0
 	controls[("setCueZero"++i).asSymbol]=();
 	controls[("setCueZero"++i).asSymbol][\name]="setCueZero"++i;
-	controls[("setCueZero"++i).asSymbol][\responder]=
-		CCResponder({arg src,chan,num,vel;decks[i].setCue(false)},nil,0,34+(i*5),nil);
+	controls[("setCueZero"++i).asSymbol][\label]="Reset Cue to Start (Chan "++(i+1)++")";
+	controls[("setCueZero"++i).asSymbol][\top]=9;
+	controls[("setCueZero"++i).asSymbol][\left]=i*2;
+	controls[("setCueZero"++i).asSymbol][\function]={arg src,chan,num,vel;decks[i].setCue(false)};
 	// skip forward
 	controls[("skipForward"++i).asSymbol]=();
 	controls[("skipForward"++i).asSymbol][\name]="skipForward"++i;
-	controls[("skipForward"++i).asSymbol][\responder]=
-		CCResponder({arg src,chan,num,vel;
+	controls[("skipForward"++i).asSymbol][\label]="Skip Forwards (Chan "++(i+1)++")";
+	controls[("skipForward"++i).asSymbol][\top]=10;
+	controls[("skipForward"++i).asSymbol][\left]=i*2;
+	controls[("skipForward"++i).asSymbol][\function]={arg src,chan,num,vel;
 			if(vel>0,{decks[i].skipForward},{decks[i].stopSkip});
-			},nil,0,48+(i*41),nil);
+			};
 	// skip slow
 	controls[("skipSlow"++i).asSymbol]=();
 	controls[("skipSlow"++i).asSymbol][\name]="skipSlow"++i;
-	controls[("skipSlow"++i).asSymbol][\responder]=
-		CCResponder({arg src,chan,num,vel;
+	controls[("skipSlow"++i).asSymbol][\label]="Slow Down (Chan "++(i+1)++")";
+	controls[("skipSlow"++i).asSymbol][\top]=11;
+	controls[("skipSlow"++i).asSymbol][\left]=i*2;
+	controls[("skipSlow"++i).asSymbol][\function]={arg src,chan,num,vel;
 				if(vel>0,{decks[i].skipSlow},{decks[i].stopSkip});
-	         },nil,0,47+(i*41),nil);
+	         };
 	// skip backwards
 	controls[("skipBackwards"++i).asSymbol]=();
 	controls[("skipBackwards"++i).asSymbol][\name]="skipBackwards"++i;
-	controls[("skipBackwards"++i).asSymbol][\responder]=
-		CCResponder({arg src,chan,num,vel;
+	controls[("skipBackwards"++i).asSymbol][\label]="Skip Backwards (Chan "++(i+1)++")";
+	controls[("skipBackwards"++i).asSymbol][\top]=12;
+	controls[("skipBackwards"++i).asSymbol][\left]=i*2;
+	controls[("skipBackwards"++i).asSymbol][\function]={arg src,chan,num,vel;
 				if(vel>0,{decks[i].skipBackwards},{decks[i].stopSkip});
-	         },nil,0,49+(i*41),nil);
+	         };
 	// retrig
 	controls[("trigOn"++i).asSymbol]=();
 	controls[("trigOn"++i).asSymbol][\name]="trigOn"++i;
-	controls[("trigOn"++i).asSymbol][\responder]=
-		CCResponder({arg src,chan,num,vel;
+	controls[("trigOn"++i).asSymbol][\label]="Trigger Chops (Chan "++(i+1)++")";
+	controls[("trigOn"++i).asSymbol][\top]=13;
+	controls[("trigOn"++i).asSymbol][\left]=i*2;
+	controls[("trigOn"++i).asSymbol][\function]={arg src,chan,num,vel;
 			if(vel>0,{decks[i].trigOn},{decks[i].trigOff})
-			},nil,0,25+(i*5),nil);
+			};
 	// trig rate
 	controls[("setTrigRate"++i).asSymbol]=();
 	controls[("setTrigRate"++i).asSymbol][\name]="setTrigRate"++i;
-	controls[("setTrigRate"++i).asSymbol][\responder]=
-		CCResponder({arg src,chan,num,vel;decks[i].setTrigRate(vel/127)},nil,0,16+(i*5),nil);
+	controls[("setTrigRate"++i).asSymbol][\label]="Chops Rate (Chan "++(i+1)++")";
+	controls[("setTrigRate"++i).asSymbol][\top]=14;
+	controls[("setTrigRate"++i).asSymbol][\left]=i*2;
+	controls[("setTrigRate"++i).asSymbol][\function]={arg src,chan,num,vel;decks[i].setTrigRate(vel/127)};
 	// rate
 	controls[("rateOn"++i).asSymbol]=();
 	controls[("rateOn"++i).asSymbol][\name]="rateOn"++i;
-	controls[("rateOn"++i).asSymbol][\responder]=
-		CCResponder({arg src,chan,num,vel;
+	controls[("rateOn"++i).asSymbol][\label]="Trigger Cut (Chan "++(i+1)++")";
+	controls[("rateOn"++i).asSymbol][\top]=15;
+	controls[("rateOn"++i).asSymbol][\left]=i*2;
+	controls[("rateOn"++i).asSymbol][\function]={arg src,chan,num,vel;
 			if(vel>0,{decks[i].rateOn},{decks[i].rateOff});
-			},nil,0,26+(i*5),nil);
+			};
 	// rate rate
 	controls[("setCutRate"++i).asSymbol]=();
 	controls[("setCutRate"++i).asSymbol][\name]="setCutRate"++i;
-	controls[("setCutRate"++i).asSymbol][\responder]=
-		CCResponder({arg src,chan,num,vel;decks[i].setCutRate(vel/127)},nil,0,17+(i*5),nil);
+	controls[("setCutRate"++i).asSymbol][\label]="Cut Playback Rate (Chan "++(i+1)++")";
+	controls[("setCutRate"++i).asSymbol][\top]=16;
+	controls[("setCutRate"++i).asSymbol][\left]=i*2;
+	controls[("setCutRate"++i).asSymbol][\function]={arg src,chan,num,vel;decks[i].setCutRate(vel/127)};
 	// vol 
 	controls[("setVol"++i).asSymbol]=();
 	controls[("setVol"++i).asSymbol][\name]="setVol"++i;
-	controls[("setVol"++i).asSymbol][\responder]=
-		CCResponder({arg src,chan,num,vel;
+	controls[("setVol"++i).asSymbol][\label]="Volume (Chan "++(i+1)++")";
+	controls[("setVol"++i).asSymbol][\top]=17;
+	controls[("setVol"++i).asSymbol][\left]=i*2;
+	controls[("setVol"++i).asSymbol][\function]={arg src,chan,num,vel;
 			decks[i].setVol((vel/127)*2);
-		},nil,0,3+(i*5),nil);
+		};
 	//Bass
 	controls[("updateLo"++i).asSymbol]=();
 	controls[("updateLo"++i).asSymbol][\name]="updateLo"++i;
-	controls[("updateLo"++i).asSymbol][\responder]=
-	CCResponder({arg src,chan,num,vel;
+	controls[("updateLo"++i).asSymbol][\label]="Bass (Chan "++(i+1)++")";
+	controls[("updateLo"++i).asSymbol][\top]=18;
+	controls[("updateLo"++i).asSymbol][\left]=i*2;
+	controls[("updateLo"++i).asSymbol][\function]={arg src,chan,num,vel;
 			vel=((vel/127)*2)-1;
 			if(vel<0, {
 				mixer.updateLo(i,vel*40);
 			},{
 				mixer.updateLo(i,vel*20);
 			});
-		},nil,0,15+(i*5),nil);
+		};
+		
+		
 	//Mid
-	controls[("updateMid"++i).asSymbol]=();
-	controls[("updateMid"++i).asSymbol][\name]="updateMid"++i;
-	controls[("updateMid"++i).asSymbol][\responder]=
-		CCResponder({arg src,chan,num,vel;
-			vel=((vel/127)*2)-1;
-			if(vel<0, {
-				mixer.updateMid(i,vel*40);
-			},{
-				mixer.updateMid(i,vel*20);
-			});	
-			},nil,0,4+(i*5),nil);
+	// controls[("updateMid"++i).asSymbol]=();
+	// controls[("updateMid"++i).asSymbol][\name]="updateMid"++i;
+	// controls[("updateMid"++i).asSymbol][\responder]=
+	// 	CCResponder({arg src,chan,num,vel;
+	// 		vel=((vel/127)*2)-1;
+	// 		if(vel<0, {
+	// 			mixer.updateMid(i,vel*40);
+	// 		},{
+	// 			mixer.updateMid(i,vel*20);
+	// 		});	
+	// 		},nil,0,4+(i*5),nil);
 	//Hi
 	// CCResponder({arg src,chan,num,vel;
 	// 		vel=((vel/127)*2)-1;
@@ -227,6 +297,8 @@ mapKeys {
 	// 			mixer.updateHi(i,vel*20);
 	// 		});	
 	// 		},nil,0,5+(i*5),nil);
+	
+	
 	}
 }
 

@@ -31,16 +31,15 @@ initPortaGUI {arg m,d;
 
 	{2.do{arg i;
 		dragBox.add(SCTextView.new(window,Rect(75+(260*i), 20, 100,20)));
-		loadButton.add(SCButton.new(window,Rect(75+(260*i),60,100,20)));
-		loadButton[i].states_([ 
-			[ "LOAD", Color(1.0, 1.0, 1.0, 1.0), Color(0.0, 0.0, 0.0, 1.0) ], 
-			[ "LOAD", Color(1.0, 1.0, 1.0, 1.0), Color(0.0, 0.0, 0.0, 1.0) ] 
-		]);
-		loadButton[i].action_({
-			dragBox[i].string[1..dragBox[i].string.size-2].postln;
-			decks[i].loadTrack(dragBox[i].string[1..dragBox[i].string.size-2]);
-			dragBox[i].string_("");
-		});
+		// loadButton.add(SCButton.new(window,Rect(75+(260*i),60,100,20)));
+		// loadButton[i].states_([ 
+		// 	[ "LOAD", Color(1.0, 1.0, 1.0, 1.0), Color(0.0, 0.0, 0.0, 1.0) ]
+		// ]);
+		// loadButton[i].action_({
+			// dragBox[i].string[1..dragBox[i].string.size-2].postln;
+			// decks[i].loadTrack(dragBox[i].string[1..dragBox[i].string.size-2]);
+			// dragBox[i].string_("");
+		// });
 		posBox.add(SCNumberBox.new(window, Rect(100+(260*i),100,50,20)));
 		rateBox.add(SCNumberBox.new(window, Rect(100+(260*i),220,50,20)));
 	    trigBox.add(SCNumberBox.new(window, Rect(100+(260*i),180,50,20)));
@@ -55,11 +54,17 @@ initPortaGUI {arg m,d;
 }
 
 update {arg param;
-	posBox[param[0]].value_(param[1][0].round(0.01));
-	rateBox[param[0]].value_(param[1][1]);
-	trigBox[param[0]].value_(param[1][2]);
-	cueBox[param[0]].value_(param[1][3]);
-	volBar[param[0]].value_((volBarVals[param[0]]*0.8));
+	var index=param[0];
+	if(dragBox[index].string.size>0,{
+		dragBox[index].string[1..dragBox[index].string.size-2].postln;
+		decks[index].loadTrack(dragBox[index].string[1..dragBox[index].string.size-2]);
+		dragBox[index].string_("");
+	});
+	posBox[index].value_(param[1][0].round(0.01));
+	rateBox[index].value_(param[1][1]);
+	trigBox[index].value_(param[1][2]);
+	cueBox[index].value_(param[1][3]);
+	volBar[index].value_((volBarVals[index]*0.8));
 	mainMix.value_(((volBarVals[0]*((mixer.mainMix.neg+1)/2))+(volBarVals[1]*((mixer.mainMix+1)/2)))*0.8);
 	window.view.background_(Color.grey(((mixer.mainMix.neg+1)/2)),0.5);
 }

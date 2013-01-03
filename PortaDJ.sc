@@ -1,6 +1,6 @@
 PortaDJ {
 
-var mixer,<>decks,midiControl,gui,lemur,midi=true;
+var mixer,<>decks,midiControl,gui;
 
 *new {
 ^super.new.initPortaDJ;
@@ -19,11 +19,7 @@ initPortaDJ {
 	mixer=Mixer.new(decks);
 	gui=PortaGUI.new(mixer,decks);
 	this.updateGUI;
-	if(midi) {
-		midiControl=LMIDI.new(mixer,decks);
-	} {
-		lemur=LemurDJ.new(mixer,decks);
-	}	
+	midiControl=LMIDI.new(mixer,decks); 	
 }
 
 updateGUI {

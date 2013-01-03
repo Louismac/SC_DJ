@@ -111,7 +111,6 @@ Track {
 	trigOn {arg tempo;
 		[tempo,trigCtr].postln;
 		if(trigCtr<4 && tempo==0) {
-			"TEST".postln;
 			this.tapTempo;
 			trigCtr=trigCtr+1;
 		} {
@@ -171,7 +170,6 @@ Track {
 				if(param[3]>0,{pos=pos+1},{pos=pos-1});
 			}}.fork;
 			((loadedBuffer.numFrames/loadedBuffer.sampleRate)*(param[3].reciprocal)).wait;
-			//buf.free;
 			pos=0;
 		}}.fork;
 	}
