@@ -17,9 +17,10 @@ initPortaDJ {
 		decks.add(Deck.new(i))
 	};
 	mixer=Mixer.new(decks);
-	gui=PortaGUI.new(mixer,decks);
-	this.updateGUI;
 	midiControl=LMIDI.new(mixer,decks); 	
+	
+	gui=PortaGUI.new([mixer,decks,midiControl]);
+	this.updateGUI;
 }
 
 updateGUI {

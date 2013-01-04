@@ -1,6 +1,8 @@
 Deck {
 classvar s;	
-var <>bus,<>track,isStopped,cuePos,fwdRoutine,bwdRoutine,slowRoutine,ref,fineTune=0,param,files,ignoreOff;
+var <>bus,<>track,isStopped,cuePos;
+var fwdRoutine,bwdRoutine,slowRoutine;
+var ref,fineTune=0,param,files,ignoreOff;
 
 *new {arg refNo;
 ^super.new.initDeck(refNo);	

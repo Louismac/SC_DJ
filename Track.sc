@@ -1,5 +1,7 @@
 Track {
-	var <>pos,tempo,buf,<>param,buf,ctr,bus,<>loadedBuffer,trigLength,<>trigBuf,<>rateBuf,deckRef,trig,rate,trigRoutine,trigTime,trigVals,rateVals,trigCtr,loop,muted;
+	var <>pos,tempo,<>param,buf,posRoutine,bus,<>loadedBuffer,deckRef,loop,muted;
+	var trigLength,<>trigBuf,trigRoutine,trigTime,trigVals,trig,trigCtr;
+	var <>rateBuf,rate,rateVals;
 	classvar s;
 
 	*new {arg path,recbus,ref;
@@ -146,7 +148,7 @@ Track {
 		"PLAY".postln;
 		pos=cuePos;
 		buf=Synth(\playTrack,[\bufnum,loadedBuffer,\startPos,(pos*44100)/64,\amp,param[0],\bus,bus,\rate,param[3],\deck,deckRef,\loop,loop]);
-		ctr={
+		posRoutine={
 		inf.do{
 			(((param[3].abs).reciprocal)/64).wait;
 			if(param[3]>0,{pos=pos+1},{pos=pos-1});
@@ -154,29 +156,9 @@ Track {
 		}.fork;
 	}
 
-	playLive {
-		var vol;
-		pos=0;
-		vol=param[0];
-		if(trig==true || rate==true) {
-			vol=0;
-		};
-		buf=Synth(\playTrack,[\bufnum,loadedBuffer,\startPos,(pos*44100)/64,\amp,vol,\bus,bus,\rate,param[3],\deck,deckRef,\loop,1]);	
-		ctr={
-		inf.do{
-			"START".postln;
-			{((loadedBuffer.numFrames/loadedBuffer.sampleRate)*(64)*(param[3].reciprocal)).do{arg i;
-				(((param[3].abs).reciprocal)/64).wait;
-				if(param[3]>0,{pos=pos+1},{pos=pos-1});
-			}}.fork;
-			((loadedBuffer.numFrames/loadedBuffer.sampleRate)*(param[3].reciprocal)).wait;
-			pos=0;
-		}}.fork;
-	}
-
 	stop {
 		buf.free;
 		buf=nil;
-		ctr.stop;
+		posRoutine.stop;
 	}
 }

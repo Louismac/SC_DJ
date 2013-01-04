@@ -1,6 +1,6 @@
 LMIDI {
 
-var mixer,decks,category,controls,file,fileReader,toLearn;
+var mixer,decks,category,controls,file,fileReader,toLearn,<>isLearning,win,btns;
 
 *new {arg m,d;
 ^super.new.initLMIDI(m,d);	
@@ -9,10 +9,10 @@ var mixer,decks,category,controls,file,fileReader,toLearn;
 initLMIDI {arg m,d;
 	mixer=m;
 	decks=d;
-	LMIDI.startMIDI;
 	this.initDictionary;
-	this.loadMap;
-	this.launchGUI;
+	isLearning=false;
+	
+	this.connectMIDIDevice;
 }
 
 *postVals {
@@ -42,10 +42,18 @@ initLMIDI {arg m,d;
 	});	
 }
 
+connectMIDIDevice {
+	LMIDI.killKeys;
+	LMIDI.startMIDI;
+	this.loadMap;
+	this.addLearnResponder;
+}
+
 launchGUI {
-	var win,btns,width=480,height=640,along=3,down=20;
+	var width=480,height=640,along=3,down=20;
 	btns=();
 	toLearn=nil;
+	isLearning=true;
 	win=SCWindow.new("",Rect(0,0,width,height)).front;
 	controls.do{arg item,i;
 		btns[item[\name].asSymbol]=Button(win,Rect(item[\left]*(width/along),item[\top]*(height/down),width/along,height/down))
@@ -75,7 +83,14 @@ launchGUI {
 	btns[\save]=Button(win,Rect(2*(width/along),0*(height/down),width/along,height/down))
 	.states_([["SAVE MAP",Color.red,Color.black]])
 	.action_({this.saveMap});
-	
+}
+
+closeGUI {
+	win.close;
+	isLearning=false;
+}
+
+addLearnResponder {
 	CCResponder({arg src,chan,num,vel;
 		if(toLearn!=nil, {
 			num.postln;
@@ -109,7 +124,7 @@ loadMap {
 		loadedMap[i].postln;
 		controls[loadedMap[i][0].asSymbol][\responder]=
 			CCResponder({arg src,chan,num,vel;
-				if(toLearn==nil,{
+				if(isLearning==false,{
 					controls[loadedMap[i][0].asSymbol][\function].value(src,chan,num,vel);
 				});
 				},
