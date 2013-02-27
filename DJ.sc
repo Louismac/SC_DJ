@@ -19,7 +19,7 @@ initDJ {
 	mixer=Mixer.new(decks);
 	midiControl=DJMIDI.new(mixer,decks); 	
 	
-	gui=GUI.new([mixer,decks,midiControl]);
+	gui=DJGUI.new([mixer,decks,midiControl]);
 	this.updateGUI;
 }
 

@@ -43,8 +43,8 @@ initDJMIDI {arg m,d;
 }
 
 connectMIDIDevice {
-	LMIDI.killKeys;
-	LMIDI.startMIDI;
+	DJMIDI.killKeys;
+	DJMIDI.startMIDI;
 	this.loadMap;
 	this.addLearnResponder;
 }
@@ -120,7 +120,7 @@ saveMap {
 
 loadMap {
  	var loadedMap=FileReader.read("DJMIDIMAP.dj");
-	LMIDI.killKeys;
+	DJMIDI.killKeys;
 	for(0,loadedMap.size-1,{arg i;
 		loadedMap[i].postln;
 		controls[loadedMap[i][0].asSymbol][\responder]=
