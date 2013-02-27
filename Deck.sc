@@ -19,7 +19,7 @@ initDeck {arg refNo;
 	isStopped=true;
 	cuePos=0;
 	param=[1,1,1,1];
-	//ignoreOff buttons ignore the MIDI off event 
+	//ignoreOff functions only respond to every second call (e.g. MIDI on (not off))
 	ignoreOff=Array.fill(6,{true});
 }	
 
@@ -124,7 +124,7 @@ stopSkip {
 powerDown{
 	var dur,index=2;
 	if(ignoreOff[index],{
-		dur=0.8;
+		dur=0.6;
 		{
 			{256.do{arg i;
 				track.skipPitch(track.param[3]*(1-(i/256)));
@@ -165,7 +165,7 @@ setCutRate {arg val;
 setToCuePos {
 	var index=4;
 	if(ignoreOff[index],{
-		//Needs 4 to get past ignoreOff (on/off/on/off)
+		//Needs 4 to get past ignoreOff (off/on/off/on)
 		this.startstop;
 		this.startstop;
 		this.startstop;
@@ -178,7 +178,6 @@ startstop {
 	var index=1;
 	if(ignoreOff[index],{
 		if(isStopped, {
-			track.postln;
 			track.play(cuePos+fineTune);
 			isStopped=false;
 		},{

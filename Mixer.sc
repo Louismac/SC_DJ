@@ -16,10 +16,10 @@ SynthDef(\mixOut,{arg out,bus1,bus2,xfade=0,channels=1;
 
 SynthDef(\eqMixer,{arg outBus,inBus,hiVal=0,midVal=0,loVal=0,channels=2;
 	var lo,mid,hi;
-	lo=BPeakEQ.ar(InFeedback.ar(inBus,2),80,0.8,loVal);
-	mid=BPeakEQ.ar(lo,1500,1,midVal);
-	hi=BPeakEQ.ar(lo,5000,0.8,hiVal);
-	Out.ar(outBus,Limiter.ar(hi,1,0.005));
+		lo=BPeakEQ.ar(InFeedback.ar(inBus,2),80,0.8,loVal);
+		mid=BPeakEQ.ar(lo,1500,1,midVal);
+		hi=BPeakEQ.ar(lo,5000,0.8,hiVal);
+		Out.ar(outBus,Limiter.ar(hi,1,0.005));
 	}).store
 }
 

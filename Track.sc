@@ -91,7 +91,13 @@ Track {
 	rateOn {
 		rate=true;
 		buf.set(\amp,0);
-		rateBuf=Synth(\playTrack,[\bufnum,loadedBuffer,\startPos,((pos*44100)/64)%loadedBuffer.numFrames,\rate,param[2]*param[3],\amp,param[0],\loop,1,\bus,bus])
+		rateBuf=Synth(\playTrack,[\bufnum,loadedBuffer,
+			\startPos,((pos*44100)/64)%loadedBuffer.numFrames,
+			\rate,param[2]*param[3],
+			\amp,param[0],
+			\loop,1,
+			\bus,bus
+		])
 	}
 
 	rateOff {
@@ -127,7 +133,11 @@ Track {
 			};
 			buf.set(\amp,0);
 			trig=true;
-			trigBuf=Synth(\playTrack,[\bufnum,loadedBuffer,\startPos,((pos*44100)/64),\rate,param[3],\amp,param[0],\bus,bus]);
+			trigBuf=Synth(\playTrack,[\bufnum,loadedBuffer,
+				\startPos,((pos*44100)/64),
+				\rate,param[3],\amp,param[0],
+				\bus,bus
+				]);
 			trigRoutine={inf.do{
 				trigBuf.set(\t_trig,1);
 				(trigLength/(param[1]*param[3])).wait;
@@ -136,7 +146,6 @@ Track {
 	}
 
 	trigOff {
-		param[0].postln;
 		if(rate==false,{buf.set(\amp,param[0])});
 		trig=false;
 		trigBuf.free;
@@ -147,7 +156,14 @@ Track {
 	play {arg cuePos;
 		"PLAY".postln;
 		pos=cuePos;
-		buf=Synth(\playTrack,[\bufnum,loadedBuffer,\startPos,(pos*44100)/64,\amp,param[0],\bus,bus,\rate,param[3],\deck,deckRef,\loop,loop]);
+		buf=Synth(\playTrack,[\bufnum,loadedBuffer,
+			\startPos,(pos*44100)/64,
+			\amp,param[0],
+			\bus,bus,
+			\rate,param[3],
+			\deck,deckRef,
+			\loop,loop
+			]);
 		posRoutine={
 		inf.do{
 			(((param[3].abs).reciprocal)/64).wait;
