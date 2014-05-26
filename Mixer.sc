@@ -1,5 +1,5 @@
 Mixer {
-classvar s;	
+classvar s;
 var decks,mainOut,cueOut,param,<>mainMix,eqBus,<>channels;
 
 *new {arg d;
@@ -12,7 +12,7 @@ SynthDef(\mixOut,{arg out,bus1,bus2,xfade=0,channels=1;
 	input1=InFeedback.ar(bus1,2);
 	input2=InFeedback.ar(bus2,2);
 	Out.ar(out,XFade2.ar(input1,input2,xfade));
-}).store;	
+}).store;
 
 SynthDef(\eqMixer,{arg outBus,inBus,hiVal=0,midVal=0,loVal=0,channels=2;
 	var lo,mid,hi;
@@ -30,9 +30,9 @@ initMixer {arg d;
 	param=[0,0,1,1];
 	mainMix=0;
 	s=Server.default;
+	eqBus=[[0,0],[0,0]];
 	mainChans=[0,1];
 	cueChans=[2,3];
-	eqBus=[[0,0],[0,0]];
 	{
 		0.5.wait;
 		2.do{arg i;
@@ -56,15 +56,15 @@ updateCueMix {arg xfade;
 }
 
 updateLo {arg chan,val;
-	eqBus[chan][1].set(\loVal,val);	
+	eqBus[chan][1].set(\loVal,val);
 }
 
 updateMid {arg chan,val;
-	eqBus[chan][1].set(\midVal,val);	
+	eqBus[chan][1].set(\midVal,val);
 }
 
 updateHi {arg chan,val;
-	eqBus[chan][1].set(\hiVal,val);	
+	eqBus[chan][1].set(\hiVal,val);
 }
 
 }

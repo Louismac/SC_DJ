@@ -3,16 +3,20 @@ DJMIDI {
 var mixer,decks,controls,file,fileReader,toLearn,<>isLearning,win,btns;
 
 *new {arg m,d;
-^super.new.initDJMIDI(m,d);	
+^super.new.initDJMIDI(m,d);
 }
 
-initDJMIDI {arg m,d;
+initDJMIDI {
+	this.connectMIDIDevice;
+}
+
+onceServerBooted {arg m,d;
 	mixer=m;
 	decks=d;
 	this.initDictionary;
+	this.loadMap;
+	this.addLearnResponder;
 	isLearning=false;
-	
-	this.connectMIDIDevice;
 }
 
 *postVals {
@@ -26,27 +30,20 @@ initDJMIDI {arg m,d;
 	MIDIIn.bend = { arg src, chan, bend; 			[chan,bend - 8192].postln; };
 	MIDIIn.sysex = { arg src, sysex; 			sysex.postln; };
 	MIDIIn.sysrt = { arg src, chan, val; 			[chan,val].postln; };
-	MIDIIn.smpte = { arg src, chan, val; 			[chan,val].postln; };	
+	MIDIIn.smpte = { arg src, chan, val; 			[chan,val].postln; };
 }
 
 *killKeys {
-	MIDIResponder.removeAll;	
+	MIDIResponder.removeAll;
 }
 
 *startMIDI {
-	var inPorts = 3, outPorts = 2;
-	
-	MIDIClient.init(inPorts,outPorts);			
-	inPorts.do({ arg i; 
-		MIDIIn.connect(i, MIDIClient.sources.at(i));
-	});	
+	MIDIIn.connectAll;
 }
 
 connectMIDIDevice {
 	DJMIDI.killKeys;
 	DJMIDI.startMIDI;
-	this.loadMap;
-	this.addLearnResponder;
 }
 
 launchGUI {
@@ -54,16 +51,15 @@ launchGUI {
 	btns=();
 	toLearn=nil;
 	isLearning=true;
-	win=SCWindow.new("Select function then press MIDI to learn",Rect(500,0,width,height)).front;
+	win=Window.new("Select function then press MIDI to learn",Rect(500,0,width,height)).front;
 	win.userCanClose=false;
 	controls.do{arg item,i;
 		btns[item[\name].asSymbol]=Button(win,Rect(item[\left]*(width/along),item[\top]*(height/down),width/along,height/down))
 		.states_([
-			[item[\label]++"\n"++"Midi note "++item[\responder].matchEvent.note,Color.yellow,Color.black],	
+			[item[\label]++"\n"++"Midi note "++item[\ccVal].asString,Color.yellow,Color.black],
 			["Press MIDI to Learn",Color.black,Color.yellow]
 		])
 		.action_({
-			item[\responder].matchEvent.note.postln;
 			if(toLearn!=nil, {
 				if(toLearn!=item[\name], {
 					btns[toLearn.asSymbol].value_(0);
@@ -72,7 +68,7 @@ launchGUI {
 					"toLearn=nil".postln;
 					toLearn=nil;
 					btns[item[\name].asSymbol].states_([
-						[item[\label]++"\n"++"Midi note "++item[\responder].matchEvent.note,Color.yellow,Color.black],	
+						[item[\label]++"\n"++"Midi note "++item[\ccVal].asString,Color.yellow,Color.black],
 						["Press MIDI to Learn",Color.black,Color.yellow]
 					])
 				});
@@ -84,6 +80,9 @@ launchGUI {
 	btns[\save]=Button(win,Rect(2*(width/along),0*(height/down),width/along,height/down))
 	.states_([["SAVE MAP",Color.red,Color.black]])
 	.action_({this.saveMap});
+/*	btns[\close]=Button(win,Rect(0*(width/along),0*(height/down),width/along,height/down))
+	.states_([["CLOSE",Color.red,Color.black]])
+	.action_({this.closeGUI});*/
 }
 
 closeGUI {
@@ -92,44 +91,62 @@ closeGUI {
 }
 
 addLearnResponder {
-	CCResponder({arg src,chan,num,vel;
-		if(toLearn!=nil, {
+	MIDIFunc.cc({arg ...args;
+		var src,chan,num,vel;
+		src=args[3];
+		chan=args[2];
+		num=args[1];
+		vel=args[0];
+		if((toLearn!=nil), {
 			num.postln;
 			try{
 				controls[toLearn.asSymbol][\responder].remove;
 				controls[toLearn.asSymbol][\responder]=
-					CCResponder(controls[toLearn.asSymbol][\function],nil,chan,num,nil);
+				MIDIFunc.cc(controls[toLearn.asSymbol][\function],num,chan);
+				controls[toLearn.asSymbol][\ccVal]=num;
+				controls[toLearn.asSymbol][\chan]=chan;
 				Task({1.do{{btns[toLearn.asSymbol].valueAction_(0)}.defer}},AppClock).play;
 			} {arg error;
 				error.postln;
 			}
 		});
-		},nil,nil,nil,nil);
+	},nil,nil,nil,nil);
 }
 
 saveMap {
  	file=File("DJMIDIMAP.dj","w");
  	controls.do{arg item,i;
- 		file.write(item[\name] ++ " " 
-			++ item[\responder].matchEvent.note ++ " " 
-			++ item[\responder].matchEvent.chan 
-			++ " \n" ); 
+ 		file.write(item[\name] ++ " "
+				++ item[\ccVal].asString ++ " "
+				++ item[\chan].asString
+			++ " \n" );
  	};
  	file.close;
 }
 
 loadMap {
- 	var loadedMap=FileReader.read("DJMIDIMAP.dj");
+ 	var loadedMap;
+	loadedMap=FileReader.read("DJMIDIMAP.dj");
 	DJMIDI.killKeys;
-	for(0,loadedMap.size-1,{arg i;
-		loadedMap[i].postln;
-		controls[loadedMap[i][0].asSymbol][\responder]=
-			CCResponder({arg src,chan,num,vel;
-				if(isLearning==false,{
-					controls[loadedMap[i][0].asSymbol][\function].value(src,chan,num,vel);
-				});
-				},
-				nil,loadedMap[i][2].asInteger,loadedMap[i][1].asInteger,nil);
+	loadedMap.postln;
+	if(loadedMap!=nil,{
+			for(0,loadedMap.size-1,{arg i;
+				loadedMap[i].postln;
+				controls[loadedMap[i][0].asSymbol][\ccVal]=loadedMap[i][1].asInteger;
+				controls[loadedMap[i][0].asSymbol][\chan]=loadedMap[i][2].asInteger;
+				controls[loadedMap[i][0].asSymbol][\responder]=
+				MIDIFunc.cc({arg ...args;
+					var src,chan,num,vel;
+					src=args[3];
+					chan=args[2];
+					num=args[1];
+					vel=args[0];
+					if(isLearning==false,{
+						args.postln;
+						controls[loadedMap[i][0].asSymbol][\function].value(src,chan,num,vel);
+					});
+				},loadedMap[i][1].asInteger,loadedMap[i][2].asInteger);
+			});
 	});
 }
 
@@ -272,7 +289,7 @@ initDictionary {
 	controls[("setCutRate"++i).asSymbol][\top]=16;
 	controls[("setCutRate"++i).asSymbol][\left]=i*2;
 	controls[("setCutRate"++i).asSymbol][\function]={arg src,chan,num,vel;decks[i].setCutRate(vel/127)};
-	// vol 
+	// vol
 	controls[("setVol"++i).asSymbol]=();
 	controls[("setVol"++i).asSymbol][\name]="setVol"++i;
 	controls[("setVol"++i).asSymbol][\label]="Volume (Chan "++(i+1)++")";
@@ -295,8 +312,8 @@ initDictionary {
 				mixer.updateLo(i,vel*20);
 			});
 		};
-		
-		
+
+
 	//Mid
 	// controls[("updateMid"++i).asSymbol]=();
 	// controls[("updateMid"++i).asSymbol][\name]="updateMid"++i;
@@ -307,7 +324,7 @@ initDictionary {
 	// 			mixer.updateMid(i,vel*40);
 	// 		},{
 	// 			mixer.updateMid(i,vel*20);
-	// 		});	
+	// 		});
 	// 		},nil,0,4+(i*5),nil);
 	//Hi
 	// CCResponder({arg src,chan,num,vel;
@@ -316,10 +333,10 @@ initDictionary {
 	// 			mixer.updateHi(i,vel*40);
 	// 		},{
 	// 			mixer.updateHi(i,vel*20);
-	// 		});	
+	// 		});
 	// 		},nil,0,5+(i*5),nil);
-	
-	
+
+
 	}
 }
 

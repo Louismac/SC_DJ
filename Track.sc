@@ -35,12 +35,16 @@ Track {
 		deckRef=ref;
 		muted=false;
 		loop=0;
+		s=Server.default;
 		trigVals=[2,4,8,16,32,64];
 		rateVals=[-2,-1,0.5,1,2,4];
 		pos=0;
 		if(path[path.size-3..path.size-1]=="mp3") {
 			"mp3".postln;
-			loadedBuffer=MP3.readToBuffer(s,path);
+			[path,path.class].postln;
+			//path="/Users/LouisMcc/Music/music/A/Abdominal & DJ Fase/Flowtation Device [UK]/08 Flowtation Device.mp3";
+			//[path,path.class].postln;
+			loadedBuffer=MP3.readToBuffer(Server.default,path);
 		} {
 			loadedBuffer=Buffer.read(s,path);
 		};
@@ -77,7 +81,7 @@ Track {
 		param[3]=val;
 		if(buf!=nil,{buf.set(\rate,param[3])});
 	}
-	
+
 	skipPitch {arg val;
 		if(buf!=nil,{buf.set(\rate,val)});
 	}
@@ -87,7 +91,7 @@ Track {
 		param[2]=rateVals[val];
 		if(trigBuf!=nil,{trigBuf.set(\rate,param[2])});
 	}
- 
+
 	rateOn {
 		rate=true;
 		buf.set(\amp,0);
@@ -104,7 +108,7 @@ Track {
 		if(trig==false,{buf.set(\amp,param[0])});
 		rate=false;
 		rateBuf.free;
-		rateBuf=nil;	
+		rateBuf=nil;
 	}
 	setTrigRate {arg val;
 		val=(val*(trigVals.size-1)).floor;
@@ -150,7 +154,7 @@ Track {
 		trig=false;
 		trigBuf.free;
 		trigRoutine.stop;
-		trigBuf=nil;	
+		trigBuf=nil;
 	}
 
 	play {arg cuePos;
