@@ -33,10 +33,8 @@ DJ{
 				decks=List.new(0);
 				buses=();
 				2.do{arg i;
-					Server.default.sync;
 					buses[i.asSymbol]=Bus.audio(Server.default,2);
 					0.5.wait;
-					buses.postln;
 					decks.add(Deck.new(i,buses[i.asSymbol]));
 				};
 				//Samplebus
