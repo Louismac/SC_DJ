@@ -1,6 +1,10 @@
 DJMIDI {
 
-var mixer,decks,controls,file,fileReader,toLearn,<>isLearning,win,btns;
+var mixer,decks,samplePad;
+var controls;
+var file,fileReader;
+var toLearn,<>isLearning;
+var win,btns;
 
 *new {arg m,d;
 ^super.new.initDJMIDI(m,d);
@@ -10,9 +14,10 @@ initDJMIDI {
 	this.connectMIDIDevice;
 }
 
-onceServerBooted {arg m,d;
-	mixer=m;
-	decks=d;
+onceServerBooted {arg modules;
+	mixer=modules[0];
+	decks=modules[1];
+	samplePad=modules[2];
 	this.initDictionary;
 	this.loadMap;
 	this.addLearnResponder;
@@ -313,6 +318,15 @@ initDictionary {
 			});
 		};
 
+	// samples
+	controls[("samples"++i).asSymbol]=();
+	controls[("samples"++i).asSymbol][\name]="samples"++i;
+	controls[("samples"++i).asSymbol][\label]="Trigger Sample ( "++(i+1)++")";
+	controls[("samples"++i).asSymbol][\top]=6+i;
+	controls[("samples"++i).asSymbol][\left]=1;
+	controls[("samples"++i).asSymbol][\function]={arg src,chan,num,vel;
+				if(vel>0,{samplePad.triggerSample(i.asSymbol)});
+			};
 
 	//Mid
 	// controls[("updateMid"++i).asSymbol]=();

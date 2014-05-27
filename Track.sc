@@ -42,8 +42,6 @@ Track {
 		if(path[path.size-3..path.size-1]=="mp3") {
 			"mp3".postln;
 			[path,path.class].postln;
-			//path="/Users/LouisMcc/Music/music/A/Abdominal & DJ Fase/Flowtation Device [UK]/08 Flowtation Device.mp3";
-			//[path,path.class].postln;
 			loadedBuffer=MP3.readToBuffer(Server.default,path);
 		} {
 			loadedBuffer=Buffer.read(s,path);

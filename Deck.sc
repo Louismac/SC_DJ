@@ -1,27 +1,26 @@
 Deck {
-classvar s;	
+classvar s;
 var <>bus,<>track,isStopped,cuePos;
 var fwdRoutine,bwdRoutine,slowRoutine;
 var ref,fineTune=0,param,files,ignoreOff;
 
-*new {arg refNo;
-^super.new.initDeck(refNo);	
+*new {arg refNo,b;
+^super.new.initDeck(refNo,b);
 }
-	
-initDeck {arg refNo;
+
+initDeck {arg refNo,b;
 	{
-		s=Server.default;
-		s.sync;
-		bus=Bus.audio(s,2);
 		this.resetAutoLoad;
 	}.fork;
+	bus=b;
+	bus.postln;
 	ref=refNo;
 	isStopped=true;
 	cuePos=0;
 	param=[1,1,1,1];
 	//ignoreOff functions only respond to every second call (e.g. MIDI on (not off))
 	ignoreOff=Array.fill(6,{true});
-}	
+}
 
 resetAutoLoad {
 	var path,index=0;
@@ -39,7 +38,7 @@ resetAutoLoad {
  loadTrack {arg path;
 	["PATH",path].postln;
 	if(track!=nil,{track.loadedBuffer.free});
-	if(isStopped==false,{track.stop;isStopped=true});	
+	if(isStopped==false,{track.stop;isStopped=true});
 	cuePos=0;
 	track=Track.new(path,bus,ref);
 }
@@ -75,7 +74,7 @@ setCue {arg val;
 }
 
 fineTuneCue {arg val;
-	fineTune=val;	
+	fineTune=val;
 }
 
 skipForward {
@@ -85,8 +84,8 @@ skipForward {
 		1.wait;
 		track.skipPitch(1.3);
 		3.wait;
-		track.skipPitch(3);	
-	}.fork;	
+		track.skipPitch(3);
+	}.fork;
 }
 
 skipSlow {
@@ -95,8 +94,8 @@ skipSlow {
 		"slow".postln;
 		track.skipPitch(0.8);
 		3.wait;
-		track.skipPitch(0.3);	
-	}.fork;	
+		track.skipPitch(0.3);
+	}.fork;
 }
 
 skipBackwards {
@@ -110,15 +109,15 @@ skipBackwards {
 		1.wait;
 		track.skipPitch(-3);
 		3.wait;
-		track.skipPitch(-6);	
-	}.fork;	
+		track.skipPitch(-6);
+	}.fork;
 }
 
 stopSkip {
 	fwdRoutine.stop;
 	bwdRoutine.stop;
 	slowRoutine.stop;
-	track.setPitch(track.param[3]);	
+	track.setPitch(track.param[3]);
 }
 
 powerDown{
@@ -131,11 +130,11 @@ powerDown{
 				(dur/256).wait;
 			}}.fork;
 			dur.wait;
-			this.startstop;	
+			this.startstop;
 		}.fork;
 		ignoreOff[index]=false;
 	},{ignoreOff[index]=true});
-	
+
 }
 
 trigOn {
@@ -151,7 +150,7 @@ rateOn {
 }
 
 rateOff {
-	track.rateOff;	
+	track.rateOff;
 }
 
 setTrigRate {arg val;
@@ -159,7 +158,7 @@ setTrigRate {arg val;
 }
 
 setCutRate {arg val;
-	track.setCutRate(val);	
+	track.setCutRate(val);
 }
 
 setToCuePos {
@@ -189,11 +188,11 @@ startstop {
 }
 
 updatePitch {arg val;
-	if(track!=nil,{track.setPitch(val)});	
+	if(track!=nil,{track.setPitch(val)});
 }
 
 setVol {arg val;
-	if(track!=nil,{track.setVol(val)});	
+	if(track!=nil,{track.setVol(val)});
 }
 
 }

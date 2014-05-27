@@ -1,7 +1,7 @@
 DJGUI {
 classvar s;
-var mixer,decks,midi,window;
-var dragBox, posBox,trigBox,rateBox,cueBox,launchMap,reconnectMIDI;
+var mixer,decks,midi,window,samplePad;
+var trackDragBox, sampleDragBox, posBox,trigBox,rateBox,cueBox,launchMap,reconnectMIDI;
 var volBar,volResponder,volBarVals,mainMix,labels;
 
 *new {arg modules;
@@ -11,7 +11,8 @@ var volBar,volResponder,volBarVals,mainMix,labels;
 onceServerBooted {arg modules;
 	mixer=modules[0];
 	decks=modules[1];
-	midi=modules[2];
+	samplePad=modules[2];
+	midi=modules[3];
 
 	launchMap=Button(window,Rect(440,0,60,50))
 	.states_([["Map MIDI",Color.yellow,Color.black],["Close",Color.black,Color.yellow]])
@@ -38,7 +39,8 @@ initDJGUI {
 	window.alwaysOnTop_(true);
 	window.view.canReceiveDragHandler={true};
 
-	dragBox=List.new(0);
+	trackDragBox=List.new(0);
+	sampleDragBox=List.new(0);
 	posBox=List.new(0);
 	rateBox=List.new(0);
 	trigBox=List.new(0);
@@ -57,7 +59,9 @@ initDJGUI {
 
 	{2.do{arg i;
 		var lbls=List.new(0);
-		dragBox.add(TextField.new(window,Rect(75+(260*i), 55, 100,25))
+		trackDragBox.add(TextField.new(window,Rect(75+(260*i), 55, 100,25))
+		.string_(""));
+		sampleDragBox.add(TextField.new(window,Rect(175+(75*i), 55, 75,25))
 		.string_(""));
 		posBox.add(NumberBox.new(window, Rect(100+(260*i),100,50,20)));
 		rateBox.add(NumberBox.new(window, Rect(100+(260*i),220,50,20)));
@@ -78,10 +82,15 @@ initDJGUI {
 
 update {arg param;
 	var index=param[0];
-	if(dragBox[index].string!="",{
-		dragBox[index].string[0..dragBox[index].string.size-1].postln;
-		decks[index].loadTrack(dragBox[index].string[0..dragBox[index].string.size-1]);
-		dragBox[index].string_("");
+	if(trackDragBox[index].string!="",{
+		trackDragBox[index].string[0..trackDragBox[index].string.size-1].postln;
+		decks[index].loadTrack(trackDragBox[index].string[0..trackDragBox[index].string.size-1]);
+		trackDragBox[index].string_("");
+	});
+	if(sampleDragBox[index].string!="",{
+		sampleDragBox[index].string[0..sampleDragBox[index].string.size-1].postln;
+		samplePad.loadSample(sampleDragBox[index].string[0..sampleDragBox[index].string.size-1],index.asSymbol);
+		sampleDragBox[index].string_("");
 	});
 	posBox[index].value_(param[1][0].round(0.01));
 	rateBox[index].value_(param[1][1]);
