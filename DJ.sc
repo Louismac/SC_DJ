@@ -20,6 +20,7 @@ DJ{
 				Server.killAll;
 
 				3.wait;
+
 				midiControl=DJMIDI.new;
 
 				gui=DJGUI.new;
@@ -32,14 +33,18 @@ DJ{
 
 				decks=List.new(0);
 				buses=();
+
 				2.do{arg i;
 					buses[i.asSymbol]=Bus.audio(Server.default,2);
 					0.5.wait;
 					decks.add(Deck.new(i,buses[i.asSymbol]));
 				};
+
 				//Samplebus
 				buses[\sample]=Bus.audio(Server.default,2);
+
 				0.5.wait;
+
 				mixer=Mixer.new(buses,chans);
 
 				samplePad=SamplePad.new;

@@ -31,7 +31,11 @@ Track {
 	initTrack {arg path,recbus,ref;
 		["PATH",path].postln;
 		//0=amp,1=reTrigRate,2=cutrate,3=rate
-		param=[1,1,1,1];
+		param=();
+		param[\amp]=1;
+		param[\retrig]=1;
+		param[\cutrate]=1;
+		param[\rate]=1;
 		deckRef=ref;
 		muted=false;
 		loop=0;
@@ -61,7 +65,7 @@ Track {
 	}
 
 	setVol {arg amp;
-		param[0]=amp;
+		param[\amp]=amp;
 		buf.set(\amp,amp);
 	}
 
@@ -72,12 +76,12 @@ Track {
 
 	unmute {
 		muted=false;
-		buf.set(\amp,param[0]);
+		buf.set(\amp,param[\amp]);
 	}
 
 	setPitch {arg val;
-		param[3]=val;
-		if(buf!=nil,{buf.set(\rate,param[3])});
+		param[\rate]=val;
+		if(buf!=nil,{buf.set(\rate,param[\rate])});
 	}
 
 	skipPitch {arg val;
@@ -86,8 +90,8 @@ Track {
 
 	setCutRate {arg val;
 		val=(val*(rateVals.size-1)).floor;
-		param[2]=rateVals[val];
-		if(trigBuf!=nil,{trigBuf.set(\rate,param[2])});
+		param[\cutrate]=rateVals[val];
+		if(trigBuf!=nil,{trigBuf.set(\rate,param[\cutrate])});
 	}
 
 	rateOn {
@@ -95,22 +99,22 @@ Track {
 		buf.set(\amp,0);
 		rateBuf=Synth(\playTrack,[\bufnum,loadedBuffer,
 			\startPos,((pos*44100)/64)%loadedBuffer.numFrames,
-			\rate,param[2]*param[3],
-			\amp,param[0],
+			\rate,param[\cutrate]*param[\rate],
+			\amp,param[\amp],
 			\loop,1,
 			\bus,bus
 		])
 	}
 
 	rateOff {
-		if(trig==false,{buf.set(\amp,param[0])});
+		if(trig==false,{buf.set(\amp,param[\amp])});
 		rate=false;
 		rateBuf.free;
 		rateBuf=nil;
 	}
 	setTrigRate {arg val;
 		val=(val*(trigVals.size-1)).floor;
-		param[1]=trigVals[val];
+		param[\retrig]=trigVals[val];
 		param.postln;
 	}
 
@@ -137,18 +141,18 @@ Track {
 			trig=true;
 			trigBuf=Synth(\playTrack,[\bufnum,loadedBuffer,
 				\startPos,((pos*44100)/64),
-				\rate,param[3],\amp,param[0],
+				\rate,param[\rate],\amp,param[\amp],
 				\bus,bus
 				]);
 			trigRoutine={inf.do{
 				trigBuf.set(\t_trig,1);
-				(trigLength/(param[1]*param[3])).wait;
+				(trigLength/(param[\retrig]*param[\rate])).wait;
 			}}.fork;
 		}
 	}
 
 	trigOff {
-		if(rate==false,{buf.set(\amp,param[0])});
+		if(rate==false,{buf.set(\amp,param[\amp])});
 		trig=false;
 		trigBuf.free;
 		trigRoutine.stop;
@@ -160,16 +164,16 @@ Track {
 		pos=cuePos;
 		buf=Synth(\playTrack,[\bufnum,loadedBuffer,
 			\startPos,(pos*44100)/64,
-			\amp,param[0],
+			\amp,param[\amp],
 			\bus,bus,
-			\rate,param[3],
+			\rate,param[\rate],
 			\deck,deckRef,
 			\loop,loop
 			]);
 		posRoutine={
 		inf.do{
-			(((param[3].abs).reciprocal)/64).wait;
-			if(param[3]>0,{pos=pos+1},{pos=pos-1});
+			(((param[\rate].abs).reciprocal)/64).wait;
+			if(param[\rate]>0,{pos=pos+1},{pos=pos-1});
 		};
 		}.fork;
 	}

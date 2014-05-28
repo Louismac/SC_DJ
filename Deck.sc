@@ -17,7 +17,12 @@ initDeck {arg refNo,b;
 	ref=refNo;
 	isStopped=true;
 	cuePos=0;
-	param=[1,1,1,1];
+	param=();
+	param[\ref]=ref;
+	param[\pos]=1;
+	param[\cutrate]=1;
+	param[\retrig]=1;
+	param[\cuePos]=1;
 	//ignoreOff functions only respond to every second call (e.g. MIDI on (not off))
 	ignoreOff=Array.fill(6,{true});
 }
@@ -56,10 +61,10 @@ loadNextTrack {
 
 getVals {
 	if(track!=nil,{
-		param[0]=track.pos/64;
-		param[1]=track.param[2];
-		param[2]=track.param[1];
-		param[3]=(cuePos+fineTune)/64;
+		param[\pos]=track.pos/64;
+		param[\cutrate]=track.param[\cutrate];
+		param[\retrig]=track.param[\retrig];
+		param[\cuePos]=(cuePos+fineTune)/64;
 	});
 	^param;
 }
@@ -117,7 +122,7 @@ stopSkip {
 	fwdRoutine.stop;
 	bwdRoutine.stop;
 	slowRoutine.stop;
-	track.setPitch(track.param[3]);
+	track.setPitch(track.param[\rate]);
 }
 
 powerDown{
@@ -126,7 +131,7 @@ powerDown{
 		dur=0.6;
 		{
 			{256.do{arg i;
-				track.skipPitch(track.param[3]*(1-(i/256)));
+				track.skipPitch(track.param[\rate]*(1-(i/256)));
 				(dur/256).wait;
 			}}.fork;
 			dur.wait;
