@@ -3,20 +3,20 @@ classvar s;
 var <>bus,<>track,isStopped,cuePos;
 var fwdRoutine,bwdRoutine,slowRoutine;
 var ref,fineTune=0,param,files,ignoreOff;
+var chans;
 
-*new {arg refNo,b;
-^super.new.initDeck(refNo,b);
+*new {arg refNo,b,c;
+^super.new.initDeck(refNo,b,c);
 }
 
-initDeck {arg refNo,b;
-	{
-		this.resetAutoLoad;
-	}.fork;
+initDeck {arg refNo,b,c;
+	//this.resetAutoLoad;
 	bus=b;
-	bus.postln;
+	["deckbus",bus].postln;
 	ref=refNo;
 	isStopped=true;
 	cuePos=0;
+	chans=c;
 	param=();
 	param[\ref]=ref;
 	param[\pos]=1;
@@ -32,10 +32,6 @@ resetAutoLoad {
 	if(ignoreOff[index],{
 		path=PathName("/Users/LouisMcc/Music/djing/sc/"++ref);
 		files=path.files;
-		for(0,files.size-1,{arg i;
-			files[i].fullPath.postln;
-			})
-		;
 		ignoreOff[index]=false;
 	},{ignoreOff[index]=true});
 }
@@ -45,7 +41,7 @@ resetAutoLoad {
 	if(track!=nil,{track.loadedBuffer.free});
 	if(isStopped==false,{track.stop;isStopped=true});
 	cuePos=0;
-	track=Track.new(path,bus,ref);
+	track=Track.new(path,bus,ref,chans);
 }
 
 loadNextTrack {

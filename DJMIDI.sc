@@ -24,20 +24,6 @@ onceServerBooted {arg modules;
 	isLearning=false;
 }
 
-*postVals {
-	this.startMIDI;
-	MIDIIn.noteOff = { arg src, chan, num, vel; 	[chan,num,vel / 127].postln; };
-	MIDIIn.noteOn = { arg src, chan, num, vel; 	[chan,num,vel / 127].postln; };
-	MIDIIn.polytouch = { arg src, chan, num, vel; 	[chan,num,vel / 127].postln; };
-	MIDIIn.control = { arg src, chan, num, val; 	[chan,num,val].postln; };
-	MIDIIn.program = { arg src, chan, prog; 		[chan,prog].postln; };
-	MIDIIn.touch = { arg src, chan, pressure; 	[chan,pressure].postln; };
-	MIDIIn.bend = { arg src, chan, bend; 			[chan,bend - 8192].postln; };
-	MIDIIn.sysex = { arg src, sysex; 			sysex.postln; };
-	MIDIIn.sysrt = { arg src, chan, val; 			[chan,val].postln; };
-	MIDIIn.smpte = { arg src, chan, val; 			[chan,val].postln; };
-}
-
 *killKeys {
 	MIDIResponder.removeAll;
 }
@@ -85,9 +71,6 @@ launchGUI {
 	btns[\save]=Button(win,Rect(2*(width/along),0*(height/down),width/along,height/down))
 	.states_([["SAVE MAP",Color.red,Color.black]])
 	.action_({this.saveMap});
-/*	btns[\close]=Button(win,Rect(0*(width/along),0*(height/down),width/along,height/down))
-	.states_([["CLOSE",Color.red,Color.black]])
-	.action_({this.closeGUI});*/
 }
 
 closeGUI {
@@ -133,10 +116,8 @@ loadMap {
  	var loadedMap;
 	loadedMap=FileReader.read("DJMIDIMAP.dj");
 	DJMIDI.killKeys;
-	loadedMap.postln;
 	if(loadedMap!=nil,{
 			for(0,loadedMap.size-1,{arg i;
-				loadedMap[i].postln;
 				controls[loadedMap[i][0].asSymbol][\ccVal]=loadedMap[i][1].asInteger;
 				controls[loadedMap[i][0].asSymbol][\chan]=loadedMap[i][2].asInteger;
 				controls[loadedMap[i][0].asSymbol][\responder]=
@@ -147,7 +128,6 @@ loadMap {
 					num=args[1];
 					vel=args[0];
 					if(isLearning==false,{
-						args.postln;
 						controls[loadedMap[i][0].asSymbol][\function].value(src,chan,num,vel);
 					});
 				},loadedMap[i][1].asInteger,loadedMap[i][2].asInteger);

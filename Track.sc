@@ -2,21 +2,37 @@ Track {
 	var <>pos,tempo,<>param,buf,posRoutine,bus,<>loadedBuffer,deckRef,loop,muted;
 	var trigLength,<>trigBuf,trigRoutine,trigTime,trigVals,trig,trigCtr;
 	var <>rateBuf,rate,rateVals;
+	var chans;
 	classvar s;
 
-	*new {arg path,recbus,ref;
-	^super.new.initTrack(path,recbus,ref);
+	*new {arg path,recbus,ref,c;
+	^super.new.initTrack(path,recbus,ref,c);
 	}
 
 	*initSynthDefs {
 
-	SynthDef(\playTrack, { arg bufnum=0,amp=1,length=1,panPot=0,rate=1,t_trig,startPos=0,loop=0,bus=nil,deck=0;
+	SynthDef(\playTrack4, { arg bufnum=0,amp=1,length=1,panPot=0,rate=1,t_trig,startPos=0,loop=0,bus=nil,deck=0;
 	var env,sound,ampTrig;
 		env=EnvGen.ar(Env([1,1],[(BufFrames.kr(bufnum)/44100)*length]), levelScale:amp);
 		ampTrig=Impulse.kr(10);
-		sound=Pan2.ar(
-			PlayBuf.ar(1, bufnum, BufRateScale.kr(bufnum) * rate, t_trig, startPos,loop),
-			panPot)*amp;
+		sound=
+			Pan2.ar(PlayBuf.ar(1, bufnum, BufRateScale.kr(bufnum) * rate, t_trig, startPos,loop),panPot)*amp;
+		//Amplitude has to take a single channeled buffer
+		SendReply.kr(ampTrig,'amp',[
+		Amplitude.kr(
+			PlayBuf.ar(1, bufnum, BufRateScale.kr(bufnum) * rate, t_trig, startPos,loop)*amp),
+			deck
+			]);
+		Out.ar(bus,sound*env);
+	}
+	).store;
+
+	SynthDef(\playTrack2, { arg bufnum=0,amp=1,length=1,rate=1,t_trig,startPos=0,loop=0,bus=nil,deck=0;
+	var env,sound,ampTrig;
+		env=EnvGen.ar(Env([1,1],[(BufFrames.kr(bufnum)/44100)*length]), levelScale:amp);
+		ampTrig=Impulse.kr(10);
+		sound=
+			PlayBuf.ar(1, bufnum, BufRateScale.kr(bufnum) * rate, t_trig, startPos,loop)*amp;
 		//Amplitude has to take a single channeled buffer
 		SendReply.kr(ampTrig,'amp',[
 		Amplitude.kr(
@@ -28,7 +44,7 @@ Track {
 	).store;
 	}
 
-	initTrack {arg path,recbus,ref;
+	initTrack {arg path,recbus,ref,c;
 		["PATH",path].postln;
 		//0=amp,1=reTrigRate,2=cutrate,3=rate
 		param=();
@@ -36,6 +52,7 @@ Track {
 		param[\retrig]=1;
 		param[\cutrate]=1;
 		param[\rate]=1;
+		chans=c;
 		deckRef=ref;
 		muted=false;
 		loop=0;
@@ -97,13 +114,23 @@ Track {
 	rateOn {
 		rate=true;
 		buf.set(\amp,0);
-		rateBuf=Synth(\playTrack,[\bufnum,loadedBuffer,
-			\startPos,((pos*44100)/64)%loadedBuffer.numFrames,
-			\rate,param[\cutrate]*param[\rate],
-			\amp,param[\amp],
-			\loop,1,
-			\bus,bus
-		])
+		if(chans==4,{
+			rateBuf=Synth(\playTrack4,[\bufnum,loadedBuffer,
+				\startPos,((pos*44100)/64)%loadedBuffer.numFrames,
+				\rate,param[\cutrate]*param[\rate],
+				\amp,param[\amp],
+				\loop,1,
+				\bus,bus
+			])
+		},{
+			rateBuf=Synth(\playTrack2,[\bufnum,loadedBuffer,
+				\startPos,((pos*44100)/64)%loadedBuffer.numFrames,
+				\rate,param[\cutrate]*param[\rate],
+				\amp,param[\amp],
+				\loop,1,
+				\bus,bus
+			])
+		});
 	}
 
 	rateOff {
@@ -139,11 +166,19 @@ Track {
 			};
 			buf.set(\amp,0);
 			trig=true;
-			trigBuf=Synth(\playTrack,[\bufnum,loadedBuffer,
-				\startPos,((pos*44100)/64),
-				\rate,param[\rate],\amp,param[\amp],
-				\bus,bus
+			if(chans==4,{
+				trigBuf=Synth(\playTrack4,[\bufnum,loadedBuffer,
+					\startPos,((pos*44100)/64),
+					\rate,param[\rate],\amp,param[\amp],
+					\bus,bus
 				]);
+			},{
+				trigBuf=Synth(\playTrack2,[\bufnum,loadedBuffer,
+					\startPos,((pos*44100)/64),
+					\rate,param[\rate],\amp,param[\amp],
+					\bus,bus
+				]);
+			});
 			trigRoutine={inf.do{
 				trigBuf.set(\t_trig,1);
 				(trigLength/(param[\retrig]*param[\rate])).wait;
@@ -160,16 +195,27 @@ Track {
 	}
 
 	play {arg cuePos;
-		"PLAY".postln;
+		("PLAY:"++chans).postln;
 		pos=cuePos;
-		buf=Synth(\playTrack,[\bufnum,loadedBuffer,
-			\startPos,(pos*44100)/64,
-			\amp,param[\amp],
-			\bus,bus,
-			\rate,param[\rate],
-			\deck,deckRef,
-			\loop,loop
+		if(chans==4,{
+			buf=Synth(\playTrack4,[\bufnum,loadedBuffer,
+				\startPos,(pos*44100)/64,
+				\amp,param[\amp],
+				\bus,bus,
+				\rate,param[\rate],
+				\deck,deckRef,
+				\loop,loop
 			]);
+		},{
+			buf=Synth(\playTrack2,[\bufnum,loadedBuffer,
+				\startPos,(pos*44100)/64,
+				\amp,param[\amp],
+				\bus,bus,
+				\rate,param[\rate],
+				\deck,deckRef,
+				\loop,loop
+			]);
+		});
 		posRoutine={
 		inf.do{
 			(((param[\rate].abs).reciprocal)/64).wait;

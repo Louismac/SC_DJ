@@ -2,8 +2,8 @@ DJ{
 
 	var mixer,<>decks,midiControl,gui,samplePad;
 
-	*new {
-		^super.new.initDJ;
+	*new {arg c;
+		^super.new.initDJ(c);
 	}
 
 	*initSynthDefs {
@@ -12,7 +12,7 @@ DJ{
 		SamplePad.initSynthDefs;
 	}
 
-	initDJ {arg chans=4;
+	initDJ {arg chans;
 		var r,buses;
 		r=Routine(
 			{
@@ -35,13 +35,25 @@ DJ{
 				buses=();
 
 				2.do{arg i;
-					buses[i.asSymbol]=Bus.audio(Server.default,2);
+					if(chans==2,{
+						buses[i.asSymbol]=Bus.audio(Server.default,1);
+						["making single channel bus"].postln;
+					},{
+						buses[i.asSymbol]=Bus.audio(Server.default,2);
+						["making 2 channel bus"].postln;
+					});
 					0.5.wait;
-					decks.add(Deck.new(i,buses[i.asSymbol]));
+					decks.add(Deck.new(i,buses[i.asSymbol],chans));
 				};
 
 				//Samplebus
-				buses[\sample]=Bus.audio(Server.default,2);
+				if(chans==2,{
+					buses[\sample]=Bus.audio(Server.default,1);
+					["making single channel bus"].postln;
+				},{
+					buses[\sample]=Bus.audio(Server.default,2);
+					["making 2 channel bus"].postln;
+				});
 
 				0.5.wait;
 
