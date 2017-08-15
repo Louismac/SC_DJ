@@ -16,7 +16,7 @@ DJ{
 		var r,buses;
 		r=Routine(
 			{
-				//Server needs to be booted after GUI made for drag and drop reasons
+				//Server needs to be booted after GUI made for drag and drop reasons.
 				Server.killAll;
 
 				3.wait;

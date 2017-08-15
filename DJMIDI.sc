@@ -114,7 +114,7 @@ saveMap {
 
 loadMap {
  	var loadedMap;
-	loadedMap=FileReader.read("DJMIDIMAP.dj");
+	loadedMap=FileReader.read("/Applications/SuperCollider/DJMIDIMAP.dj");
 	DJMIDI.killKeys;
 	if(loadedMap!=nil,{
 			for(0,loadedMap.size-1,{arg i;

@@ -23,7 +23,7 @@ initDeck {arg refNo,b,c;
 	param[\cutrate]=1;
 	param[\retrig]=1;
 	param[\cuePos]=1;
-	//ignoreOff functions only respond to every second call (e.g. MIDI on (not off))
+	//ignoreOff functions only respond to every second call (e.g. MIDI on (not off),)
 	ignoreOff=Array.fill(6,{true});
 }
 

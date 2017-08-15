@@ -46,7 +46,7 @@ Track {
 
 	initTrack {arg path,recbus,ref,c;
 		["PATH",path].postln;
-		//0=amp,1=reTrigRate,2=cutrate,3=rate
+		//0=amp,1=reTrigRate,2=cutrate,3=rate,
 		param=();
 		param[\amp]=1;
 		param[\retrig]=1;
