@@ -18,7 +18,8 @@ DJ{
 			{
 				//Server needs to be booted after GUI made for drag and drop reasons.
 				Server.killAll;
-
+				Server.default.options.numOutputBusChannels = chans;
+				Server.default.options.numInputBusChannels = chans;
 				3.wait;
 
 				midiControl=DJMIDI.new;
@@ -26,6 +27,8 @@ DJ{
 				gui=DJGUI.new;
 
 				4.wait;
+
+
 
 				Server.default.boot;
 

@@ -46,6 +46,7 @@ Track {
 
 	initTrack {arg path,recbus,ref,c;
 		["PATH",path].postln;
+		Track.initSynthDefs();
 		//0=amp,1=reTrigRate,2=cutrate,3=rate,
 		param=();
 		param[\amp]=1;

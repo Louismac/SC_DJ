@@ -48,6 +48,7 @@ Mixer {
 	}
 
 	initMixer {arg b,c;
+		Mixer.initSynthDefs();
 		channels=c;
 		buses=b;
 		param=[0,0,1,1];

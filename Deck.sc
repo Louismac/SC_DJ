@@ -139,18 +139,22 @@ powerDown{
 }
 
 trigOn {
+		"deck trig on".postln;
 	track.trigOn(0);
 }
 
 trigOff {
+		"deck trig off".postln;
 	track.trigOff;
 }
 
 rateOn {
+		"deck rate on".postln;
 	track.rateOn;
 }
 
 rateOff {
+		"deck rate off".postln;
 	track.rateOff;
 }
 

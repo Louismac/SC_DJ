@@ -94,6 +94,8 @@ addLearnResponder {
 				controls[toLearn.asSymbol][\ccVal]=num;
 				controls[toLearn.asSymbol][\chan]=chan;
 				Task({1.do{{btns[toLearn.asSymbol].valueAction_(0)}.defer}},AppClock).play;
+				this.saveMap();
+				this.loadMap();
 			} {arg error;
 				error.postln;
 			}
@@ -102,7 +104,7 @@ addLearnResponder {
 }
 
 saveMap {
- 	file=File("DJMIDIMAP.dj","w");
+ 	file=File(Platform.userAppSupportDir ++ "/DJMIDIMAP.dj" ,"w");
  	controls.do{arg item,i;
  		file.write(item[\name] ++ " "
 				++ item[\ccVal].asString ++ " "
@@ -113,26 +115,32 @@ saveMap {
 }
 
 loadMap {
- 	var loadedMap;
-	loadedMap=FileReader.read("/Applications/SuperCollider/DJMIDIMAP.dj");
-	DJMIDI.killKeys;
-	if(loadedMap!=nil,{
-			for(0,loadedMap.size-1,{arg i;
-				controls[loadedMap[i][0].asSymbol][\ccVal]=loadedMap[i][1].asInteger;
-				controls[loadedMap[i][0].asSymbol][\chan]=loadedMap[i][2].asInteger;
-				controls[loadedMap[i][0].asSymbol][\responder]=
-				MIDIFunc.cc({arg ...args;
-					var src,chan,num,vel;
-					src=args[3];
-					chan=args[2];
-					num=args[1];
-					vel=args[0];
-					if(isLearning==false,{
-						controls[loadedMap[i][0].asSymbol][\function].value(src,chan,num,vel);
-					});
-				},loadedMap[i][1].asInteger,loadedMap[i][2].asInteger);
+ 	var loadedMap, newFile;
+		if(File.exists(Platform.userAppSupportDir ++ "/DJMIDIMAP.dj") == false, {
+			newFile=File.new(Platform.userAppSupportDir ++ "/DJMIDIMAP.dj" ,"w");
+			newFile.close;
+			this.saveMap();
+		},{
+			loadedMap=FileReader.read(Platform.userAppSupportDir ++ "/DJMIDIMAP.dj");
+			DJMIDI.killKeys;
+			if(loadedMap!=nil,{
+				for(0,loadedMap.size-1,{arg i;
+					controls[loadedMap[i][0].asSymbol][\ccVal]=loadedMap[i][1].asInteger;
+					controls[loadedMap[i][0].asSymbol][\chan]=loadedMap[i][2].asInteger;
+					controls[loadedMap[i][0].asSymbol][\responder]=
+					MIDIFunc.cc({arg ...args;
+						var src,chan,num,vel;
+						src=args[3];
+						chan=args[2];
+						num=args[1];
+						vel=args[0];
+						if(isLearning==false,{
+							controls[loadedMap[i][0].asSymbol][\function].value(src,chan,num,vel);
+						});
+					},loadedMap[i][1].asInteger,loadedMap[i][2].asInteger);
+				});
 			});
-	});
+		});
 }
 
 initDictionary {
