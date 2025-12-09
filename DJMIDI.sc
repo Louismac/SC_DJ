@@ -18,9 +18,9 @@ onceServerBooted {arg modules;
 	mixer=modules[0];
 	decks=modules[1];
 	samplePad=modules[2];
-	this.initDictionary;
-	this.loadMap;
-	this.addLearnResponder;
+	this.initDictionary();
+	this.loadMap();
+	this.addLearnResponder();
 	isLearning=false;
 }
 
@@ -88,6 +88,7 @@ addLearnResponder {
 		if((toLearn!=nil), {
 			num.postln;
 			try{
+				controls[toLearn.asSymbol][\responder].free;
 				controls[toLearn.asSymbol][\responder].remove;
 				controls[toLearn.asSymbol][\responder]=
 				MIDIFunc.cc(controls[toLearn.asSymbol][\function],num,chan);
@@ -125,6 +126,7 @@ loadMap {
 			DJMIDI.killKeys;
 			if(loadedMap!=nil,{
 				for(0,loadedMap.size-1,{arg i;
+					loadedMap[i].postln;
 					controls[loadedMap[i][0].asSymbol][\ccVal]=loadedMap[i][1].asInteger;
 					controls[loadedMap[i][0].asSymbol][\chan]=loadedMap[i][2].asInteger;
 					controls[loadedMap[i][0].asSymbol][\responder]=
@@ -291,20 +293,7 @@ initDictionary {
 	controls[("setVol"++i).asSymbol][\function]={arg src,chan,num,vel;
 			decks[i].setVol((vel/127)*2);
 		};
-	//Bass
-	controls[("updateLo"++i).asSymbol]=();
-	controls[("updateLo"++i).asSymbol][\name]="updateLo"++i;
-	controls[("updateLo"++i).asSymbol][\label]="Bass (Chan "++(i+1)++")";
-	controls[("updateLo"++i).asSymbol][\top]=18;
-	controls[("updateLo"++i).asSymbol][\left]=i*2;
-	controls[("updateLo"++i).asSymbol][\function]={arg src,chan,num,vel;
-			vel=((vel/127)*2)-1;
-			if(vel<0, {
-				mixer.updateLo(i,vel*40);
-			},{
-				mixer.updateLo(i,vel*20);
-			});
-		};
+
 
 	// samples
 	controls[("samples"++i).asSymbol]=();
@@ -315,28 +304,62 @@ initDictionary {
 	controls[("samples"++i).asSymbol][\function]={arg src,chan,num,vel;
 				if(vel>0,{samplePad.triggerSample(i.asSymbol)});
 			};
+	//Bass
+	controls[("updateLo"++i).asSymbol]=();
+	controls[("updateLo"++i).asSymbol][\name]="updateLo"++i;
+	controls[("updateLo"++i).asSymbol][\label]="Bass (Chan "++(i+1)++")";
+	controls[("updateLo"++i).asSymbol][\top]=18;
+	controls[("updateLo"++i).asSymbol][\left]=i*2;
+	controls[("updateLo"++i).asSymbol][\function]={arg src,chan,num,vel;
+		vel = vel / 127;
+		mixer.updateLo(i, vel);
+	};
 
 	//Mid
-	// controls[("updateMid"++i).asSymbol]=();
-	// controls[("updateMid"++i).asSymbol][\name]="updateMid"++i;
-	// controls[("updateMid"++i).asSymbol][\responder]=
-	// 	CCResponder({arg src,chan,num,vel;
-	// 		vel=((vel/127)*2)-1;
-	// 		if(vel<0, {
-	// 			mixer.updateMid(i,vel*40);
-	// 		},{
-	// 			mixer.updateMid(i,vel*20);
-	// 		});
-	// 		},nil,0,4+(i*5),nil);
+	controls[("updateMid"++i).asSymbol]=();
+	controls[("updateMid"++i).asSymbol][\name]="updateMid"++i;
+	controls[("updateMid"++i).asSymbol][\function]={arg src,chan,num,vel;
+		vel = vel / 127;
+		mixer.updateMid(i, vel);
+	};
 	//Hi
-	// CCResponder({arg src,chan,num,vel;
-	// 		vel=((vel/127)*2)-1;
-	// 		if(vel<0, {
-	// 			mixer.updateHi(i,vel*40);
-	// 		},{
-	// 			mixer.updateHi(i,vel*20);
-	// 		});
-	// 		},nil,0,5+(i*5),nil);
+	controls[("updateHi"++i).asSymbol]=();
+	controls[("updateHi"++i).asSymbol][\name]="updateMid"++i;
+	controls[("updateHi"++i).asSymbol][\function]={arg src,chan,num,vel;
+		vel = vel / 127;
+		mixer.updateHi(i, vel);
+	};
+
+	// Loop toggle
+	controls[("loopToggle"++i).asSymbol]=();
+	controls[("loopToggle"++i).asSymbol][\name]="loopToggle"++i;
+	controls[("loopToggle"++i).asSymbol][\label]="Loop Toggle (Deck "++(i+1)++")";
+	controls[("loopToggle"++i).asSymbol][\function]={arg src,chan,num,vel;
+		if(vel > 0, {
+			decks[i].toggleLoop;
+		});
+	};
+
+	// Set loop end point
+	controls[("loopEnd"++i).asSymbol]=();
+	controls[("loopEnd"++i).asSymbol][\name]="loopEnd"++i;
+	controls[("loopEnd"++i).asSymbol][\label]="Set Loop End (Deck "++(i+1)++")";
+	controls[("loopEnd"++i).asSymbol][\function]={arg src,chan,num,vel;
+		if(vel > 0, {
+			var vals = decks[i].getVals;
+			decks[i].setLoopEnd(vals[\pos]);
+		});
+	};
+
+	// Loop length steps (1, 1/2, 1/4, 1/8, 1/16, 1/32)
+	controls[("loopLength"++i).asSymbol]=();
+	controls[("loopLength"++i).asSymbol][\name]="loopLength"++i;
+	controls[("loopLength"++i).asSymbol][\label]="Loop Length (Deck "++(i+1)++")";
+	controls[("loopLength"++i).asSymbol][\function]={arg src,chan,num,vel;
+		var steps = [1, 0.5, 0.25, 0.125, 0.0625, 0.03125];
+		var index = (vel / 127 * (steps.size - 1)).round.asInteger;
+		decks[i].setLoopLength(steps[index]);
+	};
 
 
 	}
