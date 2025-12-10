@@ -286,15 +286,6 @@ initDictionary {
 		};
 
 
-	// samples
-	controls[("samples"++i).asSymbol]=();
-	controls[("samples"++i).asSymbol][\name]="samples"++i;
-	controls[("samples"++i).asSymbol][\label]="Trigger Sample ( "++(i+1)++")";
-	controls[("samples"++i).asSymbol][\top]=6+i;
-	controls[("samples"++i).asSymbol][\left]=1;
-	controls[("samples"++i).asSymbol][\function]={arg src,chan,num,vel;
-				if(vel>0,{samplePad.triggerSample(i.asSymbol)});
-			};
 	//Bass
 	controls[("updateLo"++i).asSymbol]=();
 	controls[("updateLo"++i).asSymbol][\name]="updateLo"++i;
@@ -307,11 +298,11 @@ initDictionary {
 	};
 
 	//Mid
-	controls[("updateMid"++i).asSymbol]=();
-	controls[("updateMid"++i).asSymbol][\name]="updateMid"++i;
-	controls[("updateMid"++i).asSymbol][\function]={arg src,chan,num,vel;
+	controls[("updateDJ"++i).asSymbol]=();
+	controls[("updateDJ"++i).asSymbol][\name]="updateMid"++i;
+	controls[("updateDJ"++i).asSymbol][\function]={arg src,chan,num,vel;
 		vel = vel / 127;
-		mixer.updateMid(i, vel);
+		mixer.updateDJ(i, vel);
 	};
 	//Hi
 	controls[("updateHi"++i).asSymbol]=();

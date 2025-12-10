@@ -1,85 +1,173 @@
-DJ{
+DJ {
+	var <>mixer, <>decks, midiControl, osc, <>samplePad;
+	var resourceManager, serverBootRoutine;
+	var <isInitialized = false, <serverBooted = false;
+	var channels, buses;
 
-	var mixer,<>decks,midiControl,gui,samplePad;
-
-	*new {arg c;
-		^super.new.initDJ(c);
+	*new { arg channels = 2;
+		^super.new.initDJ(channels);
 	}
 
 	*initSynthDefs {
-		Track.initSynthDefs;
-		Mixer.initSynthDefs;
-		SamplePad.initSynthDefs;
+		DJError.handle({
+			Track.initSynthDefs;
+			Mixer.initSynthDefs;
+			SamplePad.initSynthDefs;
+			"SynthDefs initialized".postln;
+		}, "Failed to initialize SynthDefs");
 	}
 
-	initDJ {arg chans;
-		var r,buses;
-		r=Routine(
-			{
-				//Server needs to be booted after GUI made for drag and drop reasons.
-				Server.killAll;
-				Server.default.options.numOutputBusChannels = chans;
-				Server.default.options.numInputBusChannels = chans;
-				3.wait;
+	initDJ { arg chans;
+		channels = chans;
+		resourceManager = DJResourceManager.new;
 
-				midiControl=DJMIDI.new;
+		DJError.assert(
+			(channels == 2) || (channels == 4),
+			"Channels must be 2 or 4"
+		);
 
-				gui=DJGUI.new;
-
-				4.wait;
+		// Initialize collections early
+		decks = List.new(0);
 
 
-
-				Server.default.boot;
-
-				4.wait;
-
-				decks=List.new(0);
-				buses=();
-
-				2.do{arg i;
-					if(chans==2,{
-						buses[i.asSymbol]=Bus.audio(Server.default,1);
-						["making single channel bus"].postln;
-					},{
-						buses[i.asSymbol]=Bus.audio(Server.default,2);
-						["making 2 channel bus"].postln;
-					});
-					0.5.wait;
-					decks.add(Deck.new(i,buses[i.asSymbol],chans));
-				};
-
-				//Samplebus
-				if(chans==2,{
-					buses[\sample]=Bus.audio(Server.default,1);
-					["making single channel bus"].postln;
-				},{
-					buses[\sample]=Bus.audio(Server.default,2);
-					["making 2 channel bus"].postln;
-				});
-
-				0.5.wait;
-
-				mixer=Mixer.new(buses,chans);
-
-				samplePad=SamplePad.new;
-
-				midiControl.onceServerBooted([mixer,decks,samplePad]);
-				gui.onceServerBooted([mixer,decks,samplePad,midiControl]);
-				this.updateGUI;
-		});
-
-		AppClock.play(r);
+		this.initComponents;
+		this.setupServer;
+		^this;
 	}
 
-	updateGUI {
-		{inf.do{
-			(1/64).wait;
-			2.do{arg i;
-				gui.update([0,decks[0].getVals]);
-				gui.update([1,decks[1].getVals]);
-			}
-		}}.fork(AppClock);
+	setupServer {
+		var server = Server.default;
+
+		if(server.serverRunning.not) {
+			"Setting up server...".postln;
+
+			server.options.numOutputBusChannels = channels;
+			server.options.numInputBusChannels = channels;
+			server.options.memSize = 65536;
+			server.options.numBuffers = 2048;
+
+			server.waitForBoot({
+				serverBooted = true;
+				"Server booted successfully".postln;
+				this.onServerBooted;
+			}, 30, {
+				"Server boot failed!".error;
+				this.cleanup;
+			});
+		} {
+			serverBooted = true;
+			this.onServerBooted;
+		};
 	}
 
+	initComponents {
+		DJError.handle({
+
+			if(midiControl.isNil) {
+				midiControl = DJMIDI.new;
+			};
+
+			if(osc.isNil) {
+				osc = DJOSC.new;
+			};
+
+		}, "Failed to initialize components");
+	}
+
+	onServerBooted {
+		if(serverBooted.not) { ^nil };
+
+		DJError.handle({
+			var server = Server.default;
+
+			// Initialize SynthDefs first
+			this.class.initSynthDefs;
+			server.sync;
+
+			// Create buses
+			buses = this.createBuses;
+			server.sync;
+
+			// Initialize decks
+			"Initializing decks...".postln;
+			2.do { arg i;
+				var bus = buses[i.asSymbol];
+				var deck = Deck.new(i, bus, channels, resourceManager);
+				decks.add(deck);
+				("Deck " ++ i ++ " initialized with bus: " ++ bus).postln;
+			};
+
+			// Initialize mixer with the buses
+			"Initializing mixer...".postln;
+			mixer = Mixer.new(buses, channels, resourceManager);
+
+			// Initialize sample pad
+			"Initializing sample pad...".postln;
+			samplePad = SamplePad.new(resourceManager);
+
+			server.sync;
+
+			if(midiControl.notNil) {
+				midiControl.onceServerBooted([mixer, decks, samplePad]);
+			};
+
+			if(osc.notNil) {
+				osc.onceServerBooted([mixer, decks, samplePad]);
+			};
+
+
+
+			isInitialized = true;
+			"DJ system initialized successfully".postln;
+			"  - Decks: " ++ decks.size ++ " initialized".postln;
+			"  - Mixer: initialized".postln;
+			"  - Sample Pad: initialized".postln;
+		}, "Failed to initialize after server boot", { this.cleanup });
+	}
+
+	createBuses {
+		var buses = ();
+		var server = Server.default;
+
+		2.do { arg i;
+			var numChannels = if(channels == 2, 1, 2);
+			buses[i.asSymbol] = resourceManager.registerBus(
+				Bus.audio(server, numChannels)
+			);
+			("Created bus for deck " ++ i).postln;
+		};
+
+		buses[\sample] = resourceManager.registerBus(
+			Bus.audio(server, if(channels == 2, 1, 2))
+		);
+		"Created sample bus".postln;
+
+		^buses;
+	}
+
+	loadTrack { arg deckIndex, path;
+		DJError.handle({
+			DJError.assert(deckIndex < decks.size, "Invalid deck index");
+			DJError.checkFile(path);
+			decks[deckIndex].loadTrack(path);
+			("Track loaded on deck " ++ deckIndex).postln;
+		}, "Failed to load track: " ++ path);
+	}
+
+	cleanup {
+		"Cleaning up DJ system...".postln;
+
+		if(resourceManager.notNil) {
+			resourceManager.cleanup;
+		};
+		isInitialized = false;
+		serverBooted = false;
+	}
+
+	quit {
+		this.cleanup;
+		if(Server.default.serverRunning) {
+			Server.default.quit;
+		};
+	}
 }

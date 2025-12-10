@@ -15,9 +15,10 @@ DJOSC {
         OSCdef(\loadTrack, {|msg|
             var deckIndex = msg[1].asInteger;
             var path = msg[2].asString;
+			var cue = msg[3].asFloat;
 			[deckIndex,path,decks[deckIndex]].postln;
             try {
-                decks[deckIndex].loadTrack(path);
+                decks[deckIndex].loadTrack(path, cue*64);
                 oscSender.sendMsg('/trackLoaded', deckIndex, 1);
             } {|error|
                 error.postln;

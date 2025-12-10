@@ -245,36 +245,51 @@ class DJDorothy():
                 }
                 self.save_library()
                 print("save_library", deck_idx)
-                self.decks[deck_idx]['waveform'] = meta['waveform']
-                self.decks[deck_idx]['bpm'] = meta['bpm']
-                self.decks[deck_idx]['cue'] = meta['auto_cue']
-                self.decks[deck_idx]['duration'] = meta['duration']
-                self.decks[deck_idx]['rate'] = 1
+                deck = self.decks[deck_idx]
+                deck['waveform'] = meta['waveform']
+                deck['bpm'] = meta['bpm']
+                deck['cue'] = meta['auto_cue']
+                deck['duration'] = meta['duration']
+                deck['rate'] = 1
+                self.loading_complete(deck, path, deck_idx)
         except Exception as e:
             print(f"Analysis failed: {e}")
             return None
     
     def load_track(self, path, deck_idx):
         """Load track into deck"""
+        #save old before loading new
+        deck = self.decks[deck_idx]
+        if not deck["path"] is None:
+            old_path = deck['path']
+            if old_path in self.library:
+                self.library[old_path]['cue'] = deck["cue"]
+                self.library[old_path]['rate'] = deck["rate"]
+                self.save_library()
         path_str = str(path)
         print(f"loading {path} to deck {deck_idx}")
         # Check library
         if path_str in self.library:
             meta = self.library[path_str]
-            self.decks[deck_idx]['waveform'] = np.array(meta['waveform'])
-            self.decks[deck_idx]['bpm'] = meta['bpm']
-            self.decks[deck_idx]['duration'] = float(meta['duration'])
-            self.decks[deck_idx]['cue'] = float(meta['cue'])
-            self.decks[deck_idx]['rate'] = 1
+            deck['waveform'] = np.array(meta['waveform'])
+            deck['bpm'] = meta['bpm']
+            deck['duration'] = float(meta['duration'])
+            deck['cue'] = float(meta['cue'])
+            deck['rate'] = 1
+            self.loading_complete(deck, path_str, deck_idx)
         else:
             # Analyse and save
             thread = threading.Thread(target = self.analyse_track, args = (path, deck_idx,),daemon=True)
             thread.start()
-        
-        self.decks[deck_idx]['path'] = path_str
+        deck['path'] = path_str
+        if not deck['layer'] is None:
+            dot.release_layer(deck['layer'])
+        deck['layer'] = None
         print("set path")
+        
+    def loading_complete(self, deck, path_str, deck_idx):
         # Send to SuperCollider
-        self.sc_client.send_message("/loadTrack", [deck_idx, path_str])
+        self.sc_client.send_message("/loadTrack", [deck_idx, path_str, deck['cue']])
         print("send_message")
     
     def draw_meter(self, x, y, w, h, peak, rms, color):
@@ -331,20 +346,25 @@ class DJDorothy():
 
         # Background
         dot.no_stroke()
-        dot.fill(dot.black)
-        dot.rectangle((x, y), (x+waveform_width, y+h))
 
         if deck['waveform'] is not None:
             wf = deck['waveform']
-            dot.stroke(dot.yellow if deck_idx == 0 else dot.magenta)
+            
             # Draw waveform
-            for i, amp in enumerate(wf):
-                xi = int(x + ((i / len(wf))*waveform_width))
-                # print(x,xi)
-                h_bar = amp * (h * 0.8)
-                yi = y + h/2 - h_bar/2
-                dot.line((xi, yi), ((xi), yi+h_bar))
-                #dot.circle((xi,yi),5)
+            if deck['layer'] is None:
+                print("no layer")
+                deck['layer']  = dot.get_layer()
+                with dot.layer(deck['layer']):
+                    dot.set_stroke_weight(3)
+                    dot.stroke((255,255,0,200) if deck_idx == 0 else (255,0,255,200) )
+                    for i, amp in enumerate(wf):
+                        xi = int(x + ((i / len(wf))*waveform_width))
+                        h_bar = amp * (h * 0.8)
+                        yi = y + h/2 - h_bar/2
+                        dot.line((xi, yi), ((xi), yi+h_bar))
+                        #dot.circle((xi,yi),5)
+            else:
+                dot.draw_layer(deck['layer'])
 
             # Loop region (semi-transparent overlay)
             duration = deck['duration']
@@ -364,12 +384,14 @@ class DJDorothy():
             # Cue point (yellow line)
             dot.stroke(dot.yellow)
             if deck['cue'] > 0:
+                dot.set_stroke_weight(5)
                 cue_x = x + ((deck['cue'] / duration) * waveform_width)
                 dot.line((cue_x, y), (cue_x, y + h))
 
             dot.stroke(dot.red)
             # Playhead (red line)
             if deck['pos'] > 0:
+                dot.set_stroke_weight(5)
                 play_x = x + ((deck['pos'] / duration) * waveform_width)
                 dot.line((play_x, y), (play_x, y + h))
 
@@ -391,14 +413,15 @@ class DJDorothy():
     
     def setup(self):
         dot.background((30, 30, 35))
+        
         # OSC setup
         self.sc_client = udp_client.SimpleUDPClient("127.0.0.1", 57120)
         self.setup_osc_server()
         
         # State
         self.decks = [
-            {'waveform': None, 'pos': 0, 'cue': 0, 'path': None, 'bpm': 0, 'peak': 0, 'rms': 0, 'loop_end': 0, 'loop_enabled': False},
-            {'waveform': None, 'pos': 0, 'cue': 0, 'path': None, 'bpm': 0, 'peak': 0, 'rms': 0, 'loop_end': 0, 'loop_enabled': False}
+            {'waveform': None, 'pos': 0, 'cue': 0, 'path': None, 'bpm': 0, 'peak': 0, 'rms': 0, 'loop_end': 0, 'loop_enabled': False, "layer":None, "rate":1},
+            {'waveform': None, 'pos': 0, 'cue': 0, 'path': None, 'bpm': 0, 'peak': 0, 'rms': 0, 'loop_end': 0, 'loop_enabled': False,"layer":None, "rate":1}
         ]
         self.main_peak = 0
         self.main_rms = 0
