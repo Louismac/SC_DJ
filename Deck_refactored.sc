@@ -4,6 +4,8 @@ Deck_refactored {
 	var fwdRoutine, bwdRoutine, slowRoutine;
 	var ref, fineTune = 0, param, files, ignoreOff;
 	var chans, resourceManager;
+	// Stutter/tap tempo variables
+	var tapTimes, tapCount, stutterBPM, stutterRate, stutterActive, stutterRoutine, stutterSynth;
 
 	*new { arg refNo, b, c, resMgr;
 		^super.new.initDeck(refNo, b, c, resMgr);
@@ -29,6 +31,15 @@ Deck_refactored {
 		param[\loopLength] = 1;  // Current loop length multiplier (1, 0.5, 0.25, etc.)
 
 		ignoreOff = Array.fill(6, { true });
+
+		// Initialize tap tempo/stutter
+		tapTimes = [];
+		tapCount = 0;
+		stutterBPM = 120;  // Default BPM
+		stutterRate = 0.25;  // Default to 1/4 note
+		stutterActive = false;
+		stutterRoutine = nil;
+		stutterSynth = nil;
 	}
 
 	loadTrack { arg path;
@@ -43,6 +54,7 @@ Deck_refactored {
 			track = Track_refactored.new(path, bus, ref, chans, resourceManager);
 			cuePos = 0;
 			fineTune = 0;
+			this.resetTapTempo;
 		}, "Failed to load track on deck " ++ ref);
 	}
 
@@ -189,30 +201,6 @@ Deck_refactored {
 		};
 	}
 
-	skipBackwards {
-		this.stopSkipRoutines();
-
-		bwdRoutine = {
-			DJError.handle({
-				if(track.notNil) {
-					track.skipPitch(-0.5);
-					0.5.wait;
-					track.skipPitch(-1);
-					1.wait;
-					track.skipPitch(-2);
-					1.wait;
-					track.skipPitch(-3);
-					3.wait;
-					track.skipPitch(-6);
-				};
-			}, "Skip backwards failed");
-		}.fork;
-
-		if(resourceManager.notNil) {
-			resourceManager.registerRoutine(bwdRoutine);
-		};
-	}
-
 	stopSkipRoutines {
 		[fwdRoutine, bwdRoutine, slowRoutine].do { arg routine;
 			if(routine.notNil) {
@@ -264,6 +252,48 @@ Deck_refactored {
 		};
 	}
 
+	backspin {
+		DJError.handle({
+			if(track.notNil) {
+				// Disable looping during backspin
+				var wasLooping = track.loopEnabled;
+				if(wasLooping) {
+					track.toggleLoop;
+				};
+
+				{
+					var spinupDur = 2.0;  // 300ms to reach max reverse speed
+					var slowdownDur = 0.7;  // 700ms to slow down to stop
+					var maxReverseSpeed = -6;  // Fast reverse
+					var steps;
+
+					// Phase 1: Quick acceleration backwards
+					steps = 64;
+					steps.do { arg i;
+						var progress = i / steps;
+						// Exponential curve for more dramatic acceleration
+						var speed = progress.squared * maxReverseSpeed;
+						track.skipPitch(speed);
+						(spinupDur / steps).wait;
+					};
+
+					// Phase 2: Deceleration to stop (exponential slowdown)
+					steps = 128;
+					steps.do { arg i;
+						var progress = i / steps;
+						// Inverse exponential for quick slowdown
+						var speed = maxReverseSpeed * (1 - progress).cubed;
+						track.skipPitch(speed);
+						(slowdownDur / steps).wait;
+					};
+
+					// Stop playback
+					this.startstop;
+				}.fork;
+			};
+		}, "Backspin failed");
+	}
+
 	startstop {
 		var index = 1;
 		if(ignoreOff[index]) {
@@ -305,8 +335,126 @@ Deck_refactored {
 		};
 	}
 
+	tapTempo {
+		DJError.handle({
+			var currentTime = Main.elapsedTime;
+
+			if(tapCount < 4) {
+				// First 4 taps - record timing
+				tapTimes = tapTimes.add(currentTime);
+				tapCount = tapCount + 1;
+				("Tap " ++ tapCount ++ " recorded").postln;
+
+				if(tapCount == 4) {
+					// Calculate average interval between taps
+					var intervals = [],avgInterval=0;
+					3.do { arg i;
+						intervals = intervals.add(tapTimes[i+1] - tapTimes[i]);
+					};
+					avgInterval = intervals.sum / 3;
+					stutterBPM = 60 / avgInterval;  // Convert interval to BPM
+					("Tap tempo set: " ++ stutterBPM.round(0.1) ++ " BPM").postln;
+				};
+			} {
+				// After 4 taps, this starts the stutter effect
+				this.stutterOn;
+			};
+		}, "Tap tempo failed");
+	}
+
+	resetTapTempo {
+		tapTimes = [];
+		tapCount = 0;
+		("Tap tempo reset").postln;
+	}
+
+	setStutterRate { arg rate;
+		// Rate should be 1, 0.5, 0.25, 0.125, etc (1, 1/2, 1/4, 1/8...)
+		stutterRate = rate;
+		("Stutter rate set to " ++ rate).postln;
+	}
+
+	stutterOn {
+		DJError.handle({
+			if(track.notNil && track.loadedBuffer.notNil && tapCount >= 4 && stutterActive.not) {
+				var stutterInterval = (60 / stutterBPM) * stutterRate;  // Time per stutter in seconds
+				var stutterPos, stutterSamplePos;
+				var synthName = if(chans == 4, \playTrack4, \playTrack2);
+
+				stutterActive = true;
+
+				// Capture the current position for stuttering
+				stutterPos = track.pos;
+				stutterSamplePos = (stutterPos * 44100) / 64;
+
+				// Mute the original playback (it continues underneath)
+				track.setVol(0);
+
+				// Create a separate synth for stutter playback
+				stutterSynth = Synth(synthName, [
+					\bufnum, track.loadedBuffer,
+					\startPos, stutterSamplePos,
+					\amp, param[\amp] ? 1,
+					\bus, bus,
+					\rate, track.param[\rate],
+					\deck, ref,
+					\loop, 0
+				]);
+
+				if(resourceManager.notNil) {
+					resourceManager.registerSynth(stutterSynth);
+				};
+
+				// Start stutter routine - retrigger the stutter synth
+				stutterRoutine = {
+					while { stutterActive } {
+						stutterInterval.wait;
+						// Retrigger the stutter synth at the captured position
+						if(stutterSynth.notNil) {
+							stutterSynth.set(\t_trig, 1, \startPos, stutterSamplePos);
+						};
+					};
+				}.fork;
+
+				if(resourceManager.notNil) {
+					resourceManager.registerRoutine(stutterRoutine);
+				};
+
+				("Stutter ON - interval: " ++ stutterInterval.round(0.001) ++ "s").postln;
+			};
+		}, "Stutter on failed");
+	}
+
+	stutterOff {
+		DJError.handle({
+			if(stutterActive) {
+				stutterActive = false;
+
+				// Stop stutter routine
+				if(stutterRoutine.notNil) {
+					stutterRoutine.stop;
+					stutterRoutine = nil;
+				};
+
+				// Free the stutter synth
+				if(stutterSynth.notNil) {
+					stutterSynth.free;
+					stutterSynth = nil;
+				};
+
+				// Restore original volume
+				if(track.notNil) {
+					track.setVol(param[\amp] ? 1);
+				};
+
+				("Stutter OFF").postln;
+			};
+		}, "Stutter off failed");
+	}
+
 	cleanup {
 		this.stopSkipRoutines();
+		this.stutterOff;
 		if(track.notNil) {
 			track.cleanup();
 			track = nil;

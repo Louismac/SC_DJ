@@ -1,6 +1,6 @@
 Mixer_refactored {
 	classvar s;
-	var buses, mainOut, cueOut, param, <>mainMix, eqBus, channels;
+	var buses, mainOut, cueOut, param, <>mainMix, eqBus, echoBus, channels;
 	var resourceManager;
 
 	*new { arg d, c, resMgr;
@@ -70,6 +70,32 @@ Mixer_refactored {
 			Out.ar(out, Limiter.ar(output, 0.99, 0.01));
 		}).store;
 
+		SynthDef(\echo2, { arg outBus, inBus, echoOn=0;
+			var input, echo, output;
+			input = InFeedback.ar(inBus, 1);
+
+			// Echo effect with feedback
+			echo = CombC.ar(input, 2.0, 0.375, 3.0);  // ~375ms delay, 3s decay
+
+			// Mix dry and wet based on echoOn (0 = dry only, 1 = with echo)
+			output = XFade2.ar(input, echo, echoOn * 2 - 1);
+
+			Out.ar(outBus, output);
+		}).store;
+
+		SynthDef(\echo4, { arg outBus, inBus, echoOn=0;
+			var input, echo, output;
+			input = InFeedback.ar(inBus, 2);
+
+			// Echo effect with feedback
+			echo = CombC.ar(input, 2.0, 0.375, 3.0);  // ~375ms delay, 3s decay
+
+			// Mix dry and wet based on echoOn (0 = dry only, 1 = with echo)
+			output = XFade2.ar(input, echo, echoOn * 2 - 1);
+
+			Out.ar(outBus, output);
+		}).store;
+
 		SynthDef(\eqMixer2, { arg outBus, inBus, hiVal=0.5, midVal=0.5, loVal=0.5;
 			var input, lo, mid, hi, loAmp, midAmp, hiAmp, output;
 			input = InFeedback.ar(inBus, 1);
@@ -127,16 +153,47 @@ Mixer_refactored {
 			param = [0, 0, 1, 1];
 			mainMix = 0;
 			s = Server.default;
+			echoBus = [[nil, nil], [nil, nil]];  // [bus, synth] for each deck
 			eqBus = [[nil, nil], [nil, nil]];
 
 			("Initializing mixer with " ++ channels ++ " channels").postln;
 
 			Server.default.sync;
 
+			this.setupEchoBuses;
 			this.setupEQBuses;
 			this.setupMixerSynths;
 
 		}, "Failed to initialize mixer");
+	}
+
+	setupEchoBuses {
+		DJError.handle({
+			var numChannels = if(channels == 4, 2, 1);
+			var echoSynthName = if(channels == 4, \echo4, \echo2);
+
+			2.do { arg i;
+				echoBus[i][0] = Bus.audio(s, numChannels);
+
+				if(resourceManager.notNil) {
+					resourceManager.registerBus(echoBus[i][0]);
+				};
+
+				Server.default.sync;
+
+				echoBus[i][1] = Synth(echoSynthName, [
+					\outBus, echoBus[i][0],
+					\inBus, buses[i.asSymbol],
+					\echoOn, 0
+				]);
+
+				if(resourceManager.notNil) {
+					resourceManager.registerSynth(echoBus[i][1]);
+				};
+
+				("Echo bus " ++ i ++ " created").postln;
+			};
+		}, "Failed to setup echo buses");
 	}
 
 	setupEQBuses {
@@ -155,7 +212,7 @@ Mixer_refactored {
 
 				eqBus[i][1] = Synth(eqSynthName, [
 					\outBus, eqBus[i][0],
-					\inBus, buses[i.asSymbol],
+					\inBus, echoBus[i][0],  // Read from echo bus instead of deck bus
 					\hiVal, 0.5,
 					\midVal, 0.5,
 					\loVal, 0.5
@@ -256,6 +313,20 @@ Mixer_refactored {
 				eqBus[chan][1].set(\hiVal, val);
 			};
 		}, "Failed to update high EQ");
+	}
+
+	toggleEcho { arg chan;
+		DJError.handle({
+			chan = chan.clip(0, 1);
+			if(echoBus[chan][1].notNil) {
+				// Get current echo state and toggle it
+				echoBus[chan][1].get(\echoOn, { arg val;
+					var newVal = if(val == 0, 1, 0);
+					echoBus[chan][1].set(\echoOn, newVal);
+					("Echo " ++ chan ++ " set to: " ++ newVal).postln;
+				});
+			};
+		}, "Failed to toggle echo");
 	}
 
 	cleanup {

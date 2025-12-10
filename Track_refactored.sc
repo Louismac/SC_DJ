@@ -1,5 +1,5 @@
 Track_refactored {
-	var <>pos, tempo, <>param, buf, posRoutine, bus, <>loadedBuffer, deckRef, loop, muted;
+	var <>pos, tempo, <>param, <>buf, posRoutine, bus, <>loadedBuffer, deckRef, loop, muted;
 	var trigLength, <>trigBuf, trigRoutine, trigTime, trigVals, trig, trigCtr;
 	var <>rateBuf, <>rate, rateVals;
 	var chans, resourceManager;
@@ -324,60 +324,6 @@ Track_refactored {
 		rate=false;
 		rateBuf.free;
 		rateBuf=nil;
-	}
-	setTrigRate {arg val;
-		val=(val*(trigVals.size-1)).floor;
-		param[\retrig]=trigVals[val];
-		param.postln;
-	}
-
-	tapTempo {
-		trigTime.add(Main.elapsedTime);
-	}
-
-	trigOn {arg tempo;
-		[tempo,trigCtr].postln;
-		if(trigCtr<4 && tempo==0) {
-			this.tapTempo;
-			trigCtr=trigCtr+1;
-		} {
-			[trigLength,tempo].postln;
-			if(tempo>0,{trigLength=tempo/60});
-			if(trigLength<0) {
-				trigLength=0;
-				3.do{arg i;
-					trigLength=trigLength+(trigTime[i+1]-trigTime[i]);
-				};
-				trigLength=trigLength/3;
-			};
-			buf.set(\amp,0);
-			trig=true;
-			if(chans==4,{
-				trigBuf=Synth(\playTrack4,[\bufnum,loadedBuffer,
-					\startPos,((pos*44100)/64),
-					\rate,param[\rate],\amp,param[\amp],
-					\bus,bus
-				]);
-			},{
-				trigBuf=Synth(\playTrack2,[\bufnum,loadedBuffer,
-					\startPos,((pos*44100)/64),
-					\rate,param[\rate],\amp,param[\amp],
-					\bus,bus
-				]);
-			});
-			trigRoutine={inf.do{
-				trigBuf.set(\t_trig,1);
-				(trigLength/(param[\retrig]*param[\rate])).wait;
-			}}.fork;
-		}
-	}
-
-	trigOff {
-		if(rate==false,{buf.set(\amp,param[\amp])});
-		trig=false;
-		trigBuf.free;
-		trigRoutine.stop;
-		trigBuf=nil;
 	}
 
 

@@ -243,15 +243,6 @@ initDictionary {
 	controls[("skipSlow"++i).asSymbol][\function]={arg src,chan,num,vel;
 				if(vel>0,{decks[i].skipSlow},{decks[i].stopSkip});
 	         };
-	// skip backwards
-	controls[("skipBackwards"++i).asSymbol]=();
-	controls[("skipBackwards"++i).asSymbol][\name]="skipBackwards"++i;
-	controls[("skipBackwards"++i).asSymbol][\label]="Skip Backwards (Chan "++(i+1)++")";
-	controls[("skipBackwards"++i).asSymbol][\top]=12;
-	controls[("skipBackwards"++i).asSymbol][\left]=i*2;
-	controls[("skipBackwards"++i).asSymbol][\function]={arg src,chan,num,vel;
-				if(vel>0,{decks[i].skipBackwards},{decks[i].stopSkip});
-	         };
 	// retrig
 	controls[("trigOn"++i).asSymbol]=();
 	controls[("trigOn"++i).asSymbol][\name]="trigOn"++i;
@@ -359,6 +350,58 @@ initDictionary {
 		var steps = [1, 0.5, 0.25, 0.125, 0.0625, 0.03125];
 		var index = (vel / 127 * (steps.size - 1)).round.asInteger;
 		decks[i].setLoopLength(steps[index]);
+	};
+
+	// Echo toggle
+	controls[("echoToggle"++i).asSymbol]=();
+	controls[("echoToggle"++i).asSymbol][\name]="echoToggle"++i;
+	controls[("echoToggle"++i).asSymbol][\label]="Echo Toggle (Deck "++(i+1)++")";
+	controls[("echoToggle"++i).asSymbol][\function]={arg src,chan,num,vel;
+		if(vel > 0, {
+			mixer.toggleEcho(i);
+		});
+	};
+
+	// Backspin effect
+	controls[("backspin"++i).asSymbol]=();
+	controls[("backspin"++i).asSymbol][\name]="backspin"++i;
+	controls[("backspin"++i).asSymbol][\label]="Backspin (Deck "++(i+1)++")";
+	controls[("backspin"++i).asSymbol][\function]={arg src,chan,num,vel;
+		if(vel > 0, {
+			decks[i].backspin;
+		});
+	};
+
+	// Tap tempo / Stutter (press for tap, hold for stutter)
+	controls[("stutter"++i).asSymbol]=();
+	controls[("stutter"++i).asSymbol][\name]="stutter"++i;
+	controls[("stutter"++i).asSymbol][\label]="Stutter/Tap (Deck "++(i+1)++")";
+	controls[("stutter"++i).asSymbol][\function]={arg src,chan,num,vel;
+		if(vel > 0, {
+			decks[i].tapTempo;
+		}, {
+			decks[i].stutterOff;
+		});
+	};
+
+	// Stutter rate selector (1, 1/2, 1/4, 1/8, 1/16, 1/32)
+	controls[("stutterRate"++i).asSymbol]=();
+	controls[("stutterRate"++i).asSymbol][\name]="stutterRate"++i;
+	controls[("stutterRate"++i).asSymbol][\label]="Stutter Rate (Deck "++(i+1)++")";
+	controls[("stutterRate"++i).asSymbol][\function]={arg src,chan,num,vel;
+		var rates = [1, 0.5, 0.25, 0.125, 0.0625, 0.03125];
+		var index = (vel / 127 * (rates.size - 1)).round.asInteger;
+		decks[i].setStutterRate(rates[index]);
+	};
+
+	// Reset tap tempo
+	controls[("resetTap"++i).asSymbol]=();
+	controls[("resetTap"++i).asSymbol][\name]="resetTap"++i;
+	controls[("resetTap"++i).asSymbol][\label]="Reset Tap Tempo (Deck "++(i+1)++")";
+	controls[("resetTap"++i).asSymbol][\function]={arg src,chan,num,vel;
+		if(vel > 0, {
+			decks[i].resetTapTempo;
+		});
 	};
 
 
