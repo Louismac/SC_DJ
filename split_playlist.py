@@ -170,15 +170,15 @@ def split_audio_from_csv_multifile(audio_files, csv_file, output_dir="split_song
 # Example usage
 if __name__ == "__main__":
     audio_files = [
-        # "/Users/louisbusby/Music/youtube-rips/TOplaylist101225-1.wav",
+        "/Users/louisbusby/Music/youtube-rips/TOplaylist101225-1.wav",
         #"/Users/louisbusby/Music/youtube-rips/TOplaylist101225-2.wav"
         #"/Users/louisbusby/Music/youtube-rips/TOplaylist101225-3.wav"
-        "/Users/louisbusby/Music/youtube-rips/TOplaylist101225-4.wav"
+        #"/Users/louisbusby/Music/youtube-rips/TOplaylist101225-4.wav"
     ]
     
     split_audio_from_csv_multifile(
         audio_files,
-        "track-4.csv",
+        "tracks.csv",
         output_dir="split_songs",
         silence_thresh=-45,
         min_silence_len=500,

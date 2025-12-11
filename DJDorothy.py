@@ -208,25 +208,29 @@ class DJDorothy():
     
     def analyse_track(self, path, deck_idx):
         """Analyse audio file for BPM and create waveform"""
+        print("analysing")
         try:
             y, sr = librosa.load(path, sr=44100, mono=True)
             
             # BPM detection
+            print("tempo")
             tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
-            print(tempo)
+            print("tempo done")
             # Create waveform (downsample for display)
-            hop = len(y) // 600  
+            hop = len(y) // 2000  
+            print("waveform")
             waveform = np.array([
                 np.max(np.abs(y[i:i+hop])) 
                 for i in range(0, len(y), hop)
             ])
-            print("waveform")
+            print("waveform done")
+            print("onsets")
             # Find auto-cue (first strong transient after 1 sec)
             onset_env = librosa.onset.onset_strength(y=y, sr=sr)
             onsets = librosa.onset.onset_detect(
                 onset_envelope=onset_env, sr=sr, units='time'
             )
-            print("onsets")
+            print("onsets done")
             auto_cue = next((t for t in onsets if t > 1.0), 0)
             print("auto_cue")
             meta = {
@@ -341,58 +345,103 @@ class DJDorothy():
         deck = self.decks[deck_idx]
 
         # Reserve space for meter on the right
-        meter_width = 30
-        waveform_width = w - meter_width - 10
+        self.meter_width = 30
+        self.waveform_width = w - self.meter_width - 10
 
         # Background
         dot.no_stroke()
 
         if deck['waveform'] is not None:
             wf = deck['waveform']
-            
-            # Draw waveform
-            if deck['layer'] is None:
-                print("no layer")
-                deck['layer']  = dot.get_layer()
+            duration = deck['duration']
+            zoom = deck['zoom']
+
+            # Calculate which page we should be on based on playhead position
+            page_duration = duration / zoom
+            current_page = int(deck['pos'] / page_duration)
+            deck['current_page'] = current_page
+
+            # Calculate the time range for this page
+            page_start_time = current_page * page_duration
+            page_end_time = min((current_page + 1) * page_duration, duration)
+
+            # Check if we need to re-render the waveform layer
+            needs_rerender = (
+                deck['layer'] is None or
+                deck['last_rendered_zoom'] != zoom or
+                deck['last_rendered_page'] != current_page
+            )
+
+            if needs_rerender:
+                # Create or get layer
+                if deck['layer'] is None:
+                    deck['layer'] = dot.get_layer()
+
+                # Calculate which portion of the waveform to display
+                wf_len = len(wf)
+                start_idx = int((current_page / zoom) * wf_len)
+                end_idx = int(((current_page + 1) / zoom) * wf_len)
+
+                # Re-render the layer with only the visible portion
                 with dot.layer(deck['layer']):
-                    dot.set_stroke_weight(3)
-                    dot.stroke((255,255,0,200) if deck_idx == 0 else (255,0,255,200) )
-                    for i, amp in enumerate(wf):
-                        xi = int(x + ((i / len(wf))*waveform_width))
+                    dot.background(dot.black)
+                    dot.set_stroke_weight(zoom)
+                    dot.stroke((255,255,0,200) if deck_idx == 0 else (255,0,255,200))
+
+                    # Draw only the waveform data for this page
+                    visible_wf = wf[start_idx:end_idx]
+                    for i, amp in enumerate(visible_wf):
+                        xi = int(x + ((i / len(visible_wf)) * self.waveform_width))
                         h_bar = amp * (h * 0.8)
                         yi = y + h/2 - h_bar/2
-                        dot.line((xi, yi), ((xi), yi+h_bar))
-                        #dot.circle((xi,yi),5)
-            else:
-                dot.draw_layer(deck['layer'])
+                        dot.line((xi, yi), (xi, yi+h_bar))
+
+                # Update render tracking
+                deck['last_rendered_zoom'] = zoom
+                deck['last_rendered_page'] = current_page
+
+            # Draw the layer (no transform needed - already rendered at correct size)
+            dot.draw_layer(deck['layer'])
 
             # Loop region (semi-transparent overlay)
-            duration = deck['duration']
             if deck['loop_enabled'] and deck['loop_end'] > deck['cue']:
-                loop_start_x = x + ((deck['cue'] / duration) * waveform_width)
-                loop_end_x = x + ((deck['loop_end'] / duration) * waveform_width)
-                # Draw loop region as semi-transparent rectangle
-                dot.fill((0, 255, 255, 30))  # Cyan with low alpha
-                dot.no_stroke()
-                dot.rectangle((loop_start_x, y), (loop_end_x, y + h))
+                # Calculate loop positions relative to current page
+                loop_start_norm = (deck['cue'] - page_start_time) / page_duration
+                loop_end_norm = (deck['loop_end'] - page_start_time) / page_duration
 
-                # Draw loop boundaries
-                dot.stroke((0, 255, 255))  # Cyan
-                dot.line((loop_start_x, y), (loop_start_x, y + h))  # Loop start (cue point)
-                dot.line((loop_end_x, y), (loop_end_x, y + h))  # Loop end
+                # Only draw if visible on current page
+                if loop_end_norm >= 0 and loop_start_norm <= 1:
+                    loop_start_x = x + (loop_start_norm * self.waveform_width)
+                    loop_end_x = x + (loop_end_norm * self.waveform_width)
+
+                    # Clamp to viewport
+                    loop_start_x = max(loop_start_x, x)
+                    loop_end_x = min(loop_end_x, x + self.waveform_width)
+
+                    dot.fill((0, 255, 255, 30))
+                    dot.no_stroke()
+                    dot.rectangle((loop_start_x, y), (loop_end_x, y + h))
+
+                    dot.stroke((0, 255, 255))
+                    if loop_start_norm >= 0 and loop_start_norm <= 1:
+                        dot.line((loop_start_x, y), (loop_start_x, y + h))
+                    if loop_end_norm >= 0 and loop_end_norm <= 1:
+                        dot.line((loop_end_x, y), (loop_end_x, y + h))
 
             # Cue point (yellow line)
-            dot.stroke(dot.yellow)
-            if deck['cue'] > 0:
+            cue_norm = (deck['cue'] - page_start_time) / page_duration
+            if deck['cue'] > 0 and cue_norm >= 0 and cue_norm <= 1:
+                dot.stroke(dot.yellow)
                 dot.set_stroke_weight(5)
-                cue_x = x + ((deck['cue'] / duration) * waveform_width)
+                cue_x = x + (cue_norm * self.waveform_width)
                 dot.line((cue_x, y), (cue_x, y + h))
 
-            dot.stroke(dot.red)
             # Playhead (red line)
-            if deck['pos'] > 0:
+            pos_norm = (deck['pos'] - page_start_time) / page_duration
+            if deck['pos'] > 0 and pos_norm >= 0 and pos_norm <= 1:
+                dot.stroke(dot.red)
                 dot.set_stroke_weight(5)
-                play_x = x + ((deck['pos'] / duration) * waveform_width)
+                play_x = x + (pos_norm * self.waveform_width)
                 dot.line((play_x, y), (play_x, y + h))
 
         # Label
@@ -405,11 +454,17 @@ class DJDorothy():
             label += f" ({bpm:.1f} BPM)"
         dot.text(label, x + 10, y + 20, size=14)
 
+        # Zoom level and page indicator
+        if deck['waveform'] is not None:
+            zoom_info = f"Zoom: {deck['zoom']}x | Page: {deck['current_page'] + 1}/{deck['zoom']}"
+            dot.fill((150, 150, 150))
+            dot.text(zoom_info, x + 10, y + 40, size=12)
+
         # Draw meter
-        meter_x = x + waveform_width + 10
+        meter_x = x + self.waveform_width + 10
         meter_color = dot.yellow if deck_idx == 0 else dot.magenta
         if deck_idx <2:
-            self.draw_meter(meter_x, y + 30, meter_width, h - 40, deck['peak'], deck['rms'], meter_color)
+            self.draw_meter(meter_x, y + 30, self.meter_width, h - 40, deck['peak'], deck['rms'], meter_color)
     
     def setup(self):
         dot.background((30, 30, 35))
@@ -420,8 +475,8 @@ class DJDorothy():
         
         # State
         self.decks = [
-            {'waveform': None, 'pos': 0, 'cue': 0, 'path': None, 'bpm': 0, 'peak': 0, 'rms': 0, 'loop_end': 0, 'loop_enabled': False, "layer":None, "rate":1},
-            {'waveform': None, 'pos': 0, 'cue': 0, 'path': None, 'bpm': 0, 'peak': 0, 'rms': 0, 'loop_end': 0, 'loop_enabled': False,"layer":None, "rate":1}
+            {'waveform': None, 'pos': 0, 'cue': 0, 'path': None, 'bpm': 0, 'peak': 0, 'rms': 0, 'loop_end': 0, 'loop_enabled': False, "layer":None, "rate":1, 'zoom': 1, 'current_page': 0, 'last_rendered_zoom': None, 'last_rendered_page': None},
+            {'waveform': None, 'pos': 0, 'cue': 0, 'path': None, 'bpm': 0, 'peak': 0, 'rms': 0, 'loop_end': 0, 'loop_enabled': False,"layer":None, "rate":1, 'zoom': 1, 'current_page': 0, 'last_rendered_zoom': None, 'last_rendered_page': None}
         ]
         self.main_peak = 0
         self.main_rms = 0
@@ -434,18 +489,48 @@ class DJDorothy():
         music_folder = Path.home() / "Music" / "dj"
         self.browser_w = 300
         self.browser = FolderBrowser(
-            dot, 
+            dot,
             music_folder,
             x=0, y=0,
             width=self.browser_w, height=dot.height,
             max_per_page=15,load_callback=self.load_track
         )
         dot.on_mouse_press = self.mouse_pressed
+
+        # Create zoom controls
+        zoom_y = dot.height - 100
+        dot.create_button(
+            5, zoom_y, 70, 40,
+            text="D1 Z-",
+            id="deck1_zoom_out",
+            on_release=self.zoom_pressed
+        )
+        dot.create_button(
+            80, zoom_y, 70, 40,
+            text="D1 Z+",
+            id="deck1_zoom_in",
+            on_release=self.zoom_pressed
+        )
+
+        # Zoom controls for Deck 2
+        dot.create_button(
+            160, zoom_y, 70, 40,
+            text="D2 Z-",
+            id="deck2_zoom_out",
+            on_release=self.zoom_pressed
+        )
+        dot.create_button(
+            235, zoom_y, 70, 40,
+            text="D2 Z+",
+            id="deck2_zoom_in",
+            on_release=self.zoom_pressed
+        )
        
         
     def draw(self):
         dot.background((30, 30, 35))
         dot.update_buttons()
+        dot.no_stroke()
         dot.draw_buttons()
 
         # Reserve space for main meter on right side
@@ -473,29 +558,62 @@ class DJDorothy():
             print(traceback.format_exc())
             print(err)
     
+    def zoom_pressed(self, btn):
+        if btn.id == "deck1_zoom_out":
+            self.change_zoom(0,-1)
+        if btn.id == "deck1_zoom_in":
+            self.change_zoom(0,1)
+        if btn.id == "deck2_zoom_out":
+            self.change_zoom(1,-1)
+        if btn.id == "deck2_zoom_in":
+            self.change_zoom(1,1)
+    
+    def change_zoom(self, deck_idx, delta):
+        """Change zoom level for a deck"""
+        if 0 <= deck_idx < len(self.decks):
+            current_zoom = self.decks[deck_idx]['zoom']
+            # Zoom levels: 1, 2, 4, 8, 16, 32
+            zoom_levels = [1, 2, 3, 4, 5, 6, 7, 8]
+            try:
+                current_idx = zoom_levels.index(current_zoom)
+                new_idx = max(0, min(len(zoom_levels) - 1, current_idx + delta))
+                self.decks[deck_idx]['zoom'] = zoom_levels[new_idx]
+                print(f"Deck {deck_idx + 1} zoom: {self.decks[deck_idx]['zoom']}x")
+            except ValueError:
+                # Current zoom not in list, find closest
+                if delta > 0:
+                    self.decks[deck_idx]['zoom'] = min(32, current_zoom * 2)
+                else:
+                    self.decks[deck_idx]['zoom'] = max(1, current_zoom // 2)
+
     def mouse_pressed(self,x,y,b):
         """Click to set cue point"""
         deck_h = (dot.height - 60) // 2
 
-        # Account for meters in layout
-        main_meter_width = 40
-        main_meter_padding = 10
-        available_width = dot.width - 200 - main_meter_width - main_meter_padding
-        meter_width = 30
-
         for i in range(2):
             y_start = 0 if i == 0 else deck_h
             # Check if click is in waveform area (not in meter area)
-            if dot.mouse_x > self.browser_w and dot.mouse_x < (self.browser_w + available_width - meter_width - 10):
+            if dot.mouse_x > self.browser_w and dot.mouse_x < (self.browser_w + self.waveform_width):
                 # Calculate position in track
                 rel_x = dot.mouse_x - self.browser_w
                 i = 0 if dot.mouse_y < deck_h else 1
                 if self.decks[i]['waveform'] is not None:
-                    waveform_width = available_width - meter_width - 10
                     duration = self.decks[i]['duration']
-                    cue_time = float((rel_x/waveform_width) * duration)
+                    zoom = self.decks[i]['zoom']
+                    current_page = self.decks[i]['current_page']
+
+                    # Calculate which portion of the track is visible on current page
+                    page_duration = duration / zoom
+                    page_start_time = current_page * page_duration
+
+                    # Calculate normalized position within the visible page (0 to 1)
+                    norm_x = rel_x / self.waveform_width
+
+                    # Convert to actual time in track
+                    cue_time = page_start_time + (norm_x * page_duration)
+
                     self.decks[i]['cue'] = cue_time
-                    print(f"setting cue time {cue_time} for deck {i}")
+                    print(f"Setting cue time {cue_time:.2f}s for deck {i} (zoom: {zoom}x, page: {current_page + 1})")
                     # Send to SC
                     self.sc_client.send_message("/setCue", [i, cue_time])
 

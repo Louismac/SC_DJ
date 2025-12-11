@@ -54,7 +54,7 @@ Mixer {
 			SendPeakRMS.kr(input2, 20, 3, '/meter', replyID: 1);
 			SendPeakRMS.kr(output, 20, 3, '/meter', replyID: 2);
 
-			Out.ar(out, Limiter.ar(output, 0.99, 0.01));
+			Out.ar(out, output);
 		}).store;
 
 		// Cue output without meters (stereo)
@@ -67,7 +67,7 @@ Mixer {
 			samples = InFeedback.ar(sampleBus, 2);
 			output = XFade2.ar(tracks, samples, 0);
 
-			Out.ar(out, Limiter.ar(output, 0.99, 0.01));
+			Out.ar(out, output);
 		}).store;
 
 		SynthDef(\echo2, { arg outBus, inBus, echoOn=0;
