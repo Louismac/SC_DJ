@@ -204,6 +204,7 @@ class DJDorothy():
     
     def save_library(self):
         with open(self.library_path, 'w') as f:
+
             json.dump(self.library, f, indent=2)
     
     def analyse_track(self, path, deck_idx):
@@ -215,15 +216,7 @@ class DJDorothy():
             # BPM detection
             print("tempo")
             tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
-            print("tempo done")
-            # Create waveform (downsample for display)
-            hop = len(y) // 2000  
-            print("waveform")
-            waveform = np.array([
-                np.max(np.abs(y[i:i+hop])) 
-                for i in range(0, len(y), hop)
-            ])
-            print("waveform done")
+            print("tempo done", tempo)
             print("onsets")
             # Find auto-cue (first strong transient after 1 sec)
             onset_env = librosa.onset.onset_strength(y=y, sr=sr)
@@ -234,29 +227,25 @@ class DJDorothy():
             auto_cue = next((t for t in onsets if t > 1.0), 0)
             print("auto_cue")
             meta = {
-                'waveform': waveform,
                 'bpm': float(np.mean(tempo)),
                 'auto_cue': auto_cue,
                 'cue':0,
-                'duration': len(y) / sr
             }
             if meta:
                 self.library[str(path)] = {
-                    'waveform': meta['waveform'].tolist(),
                     'bpm': float(meta['bpm']),
-                    'duration': float(meta['duration']),
-                    'cue': float(meta['auto_cue'])
+                    'cue': int(meta['auto_cue'])
                 }
                 self.save_library()
                 print("save_library", deck_idx)
                 deck = self.decks[deck_idx]
-                deck['waveform'] = meta['waveform']
                 deck['bpm'] = meta['bpm']
                 deck['cue'] = meta['auto_cue']
-                deck['duration'] = meta['duration']
                 deck['rate'] = 1
                 self.loading_complete(deck, path, deck_idx)
         except Exception as e:
+            import traceback
+            print(traceback.format_exc())
             print(f"Analysis failed: {e}")
             return None
     
@@ -272,13 +261,22 @@ class DJDorothy():
                 self.save_library()
         path_str = str(path)
         print(f"loading {path} to deck {deck_idx}")
-        # Check library
+        y, sr = librosa.load(path, sr=44100, mono=True)
+        hop = len(y) // 2000  
+        print("waveform")
+        waveform = np.array([
+            np.max(np.abs(y[i:i+hop])) 
+            for i in range(0, len(y), hop)
+        ])
+        deck['waveform'] = np.array(waveform)
+        deck['duration']= len(y) / sr
+
+        #check library
         if path_str in self.library:
+        # if False:
             meta = self.library[path_str]
-            deck['waveform'] = np.array(meta['waveform'])
             deck['bpm'] = meta['bpm']
-            deck['duration'] = float(meta['duration'])
-            deck['cue'] = float(meta['cue'])
+            deck['cue'] = int(meta['cue'])
             deck['rate'] = 1
             self.loading_complete(deck, path_str, deck_idx)
         else:
@@ -286,14 +284,17 @@ class DJDorothy():
             thread = threading.Thread(target = self.analyse_track, args = (path, deck_idx,),daemon=True)
             thread.start()
         deck['path'] = path_str
-        if not deck['layer'] is None:
+        # Reset layer when loading new track
+        if deck['layer'] is not None:
             dot.release_layer(deck['layer'])
         deck['layer'] = None
+        deck['last_rendered_zoom'] = None
+        deck['last_rendered_page'] = None
         print("set path")
         
     def loading_complete(self, deck, path_str, deck_idx):
         # Send to SuperCollider
-        self.sc_client.send_message("/loadTrack", [deck_idx, path_str, deck['cue']])
+        self.sc_client.send_message("/loadTrack", [int(deck_idx), str(path_str), int(deck['cue'])])
         print("send_message")
     
     def draw_meter(self, x, y, w, h, peak, rms, color):
@@ -373,9 +374,12 @@ class DJDorothy():
             )
 
             if needs_rerender:
-                # Create or get layer
+                # Create or get layer - ensure unique layer per deck
                 if deck['layer'] is None:
+                    # Create a new layer with a unique identifier
+                    layer_id = f"deck_{deck_idx}_waveform"
                     deck['layer'] = dot.get_layer()
+                    print(f"Created layer {layer_id} for deck {deck_idx}")
 
                 # Calculate which portion of the waveform to display
                 wf_len = len(wf)
@@ -384,7 +388,9 @@ class DJDorothy():
 
                 # Re-render the layer with only the visible portion
                 with dot.layer(deck['layer']):
+                    #Clear,then make transparent
                     dot.background(dot.black)
+                    dot.cutout(dot.black)
                     dot.set_stroke_weight(zoom)
                     dot.stroke((255,255,0,200) if deck_idx == 0 else (255,0,255,200))
 
@@ -480,7 +486,7 @@ class DJDorothy():
         ]
         self.main_peak = 0
         self.main_rms = 0
-        self.library_path = Path.home() / ".dj_library.json"
+        self.library_path = Path("dj_library.json")
         self.library = self.load_library()
         
         # UI state

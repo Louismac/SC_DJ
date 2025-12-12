@@ -121,6 +121,7 @@ Track {
 	}
 
 	setCuePos { arg pos;
+		["track cue pos",pos].postln;
 		cuePos = pos;
 	}
 
@@ -223,6 +224,7 @@ Track {
 					// Handle looping
 					if(loopEnabled && (pos >= loopEnd)) {
 						pos = cuePos;
+						cuePos.postln;
 						if(buf.notNil) {
 							buf.set(\t_trig, 1, \startPos, (cuePos * 44100) / 64);
 						};

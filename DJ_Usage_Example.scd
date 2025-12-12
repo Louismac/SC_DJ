@@ -1,6 +1,6 @@
 // DJ System Refactored - Usage Example
 // This example shows how to use the refactored DJ system with improved error handling
-
+Server.killAll
 (
 
 // 1. Initialize the DJ system - this will boot the server automatically
@@ -9,3 +9,6 @@
 )
 
 Track.initSynthDefs
+
+a  = ()
+a.size

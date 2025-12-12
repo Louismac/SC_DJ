@@ -63,21 +63,26 @@ DJOSC {
                 if(decks.notNil and: {decks.size >= 2}, {
                     2.do{arg i;
                         var vals = decks[i].getVals;
-                        oscSender.sendMsg('/deck', i,
-                            vals[\pos],
-                            vals[\cuePos],
-                            vals[\cutrate],
-                            vals[\retrig],
-							vals[\rate],
-							vals[\loopEnd],
-							if(vals[\loopEnabled], 1, 0)
-                        );
+						// [vals,"startSending", i].postln;
+						if(vals.size > 0,{
+
+							oscSender.sendMsg('/deck', i,
+								vals[\pos],
+								vals[\cuePos],
+								vals[\cutrate],
+								vals[\retrig],
+								vals[\rate],
+								vals[\loopEnd],
+								if(vals[\loopEnabled], 1, 0)
+							);
+						});
                     };
                     oscSender.sendMsg('/mixer',
                         mixer.mainMix
                     );
                 });
             } {|error|
+				error.postln;
                 // Silent fail for GUI updates
             };
         }}.fork(AppClock);

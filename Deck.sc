@@ -1,9 +1,10 @@
 Deck {
 	classvar s;
-	var <>bus, <>track, isStopped, cuePos;
+	var <>bus, <>track, isStopped;
 	var fwdRoutine, bwdRoutine, slowRoutine;
-	var ref, fineTune = 0, param, files, ignoreOff;
+	var param, files, ignoreOff;
 	var chans, resourceManager;
+	var toSend;
 	// Stutter/tap tempo variables
 	var tapTimes, tapCount, stutterBPM, stutterRate, stutterActive, stutterRoutine, stutterSynth;
 
@@ -14,18 +15,17 @@ Deck {
 	initDeck { arg refNo, b, c, resMgr;
 		bus = b;
 		("Initializing deck " ++ refNo ++ " with bus: " ++ bus).postln;
-		ref = refNo;
 		isStopped = true;
-		cuePos = 0;
 		chans = c;
 		resourceManager = resMgr;
-
+		toSend = ();
 		param = ();
-		param[\ref] = ref;
+		param[\ref] = refNo;
 		param[\pos] = 1;
 		param[\cutrate] = 1;
 		param[\retrig] = 1;
-		param[\cuePos] = 1;
+		param[\cuePos] = 0;
+		param[\fineTune] = 0;
 		param[\loopEnd] = 0;     // Loop end point (will be set to track end when loaded)
 		param[\loopEnabled] = false;
 		param[\loopLength] = 1;  // Current loop length multiplier (1, 0.5, 0.25, etc.)
@@ -44,18 +44,17 @@ Deck {
 
 	loadTrack { arg path, cp =0;
 		DJError.handle({
-			("Deck " ++ ref ++ " loading track: " ++ path).postln;
+			("Deck " ++ param[\ref] ++ " loading track: " ++ path).postln;
 
 			if(track.notNil) {
 				this.stopTrack();
 				track.cleanup();
 			};
 
-			track = Track.new(path, bus, ref, chans, resourceManager);
-			cuePos = cp;
-			fineTune = 0;
+			track = Track.new(path, bus, param[\ref], chans, resourceManager);
+			param[\cuePos] = cp;
 			this.resetTapTempo;
-		}, "Failed to load track on deck " ++ ref);
+		}, "Failed to load track on deck " ++ param[\ref]);
 	}
 
 	stopTrack {
@@ -68,17 +67,21 @@ Deck {
 	getVals {
 		if(track.notNil) {
 			DJError.handle({
-				// track.pos.postln;
-				param[\pos] = track.pos / 64;
-				param[\cutrate] = track.param[\cutrate];
-				param[\retrig] = track.param[\retrig];
-				param[\cuePos] = (cuePos + fineTune) / 64;
-				param[\rate] = track.param[\rate];
-				param[\loopEnd] = track.loopEnd / 64;
-				param[\loopEnabled] = track.loopEnabled;
+				// track.pos.postln
+				toSend[\ref] = param[\ref];
+				toSend[\pos] = track.pos / 64;
+				toSend[\cutrate] = track.param[\cutrate];
+				toSend[\retrig] = track.param[\retrig];
+				toSend[\cuePos] = (param[\cuePos] + param[\fineTune]) / 64;
+				toSend[\rate] = track.param[\rate];
+				toSend[\loopEnd] = track.loopEnd / 64;
+				toSend[\loopEnabled] = track.loopEnabled;
+				toSend[\loopLength] = param[\loopLength];
+				// toSend.postln;
+				^toSend;
 			}, "Failed to get deck values");
 		};
-		^param;
+		^toSend;
 	}
 
 	setLoopEnd { arg pos;
@@ -127,12 +130,10 @@ Deck {
 			DJError.handle({
 				if(track.notNil) {
 					["setting cue to ",val*64].postln;
-					cuePos = val*64;
-					track.setCuePos(cuePos);
-				} {
-					cuePos = 0;
+					["fineTune",param[\fineTune]].postln;
+					param[\cuePos] = val*64;
+					track.setCuePos(param[\cuePos]+param[\fineTune]);
 				};
-				fineTune = 0;
 				ignoreOff[index] = false;
 			}, "Failed to set cue point");
 		} {
@@ -145,12 +146,9 @@ Deck {
 		if(ignoreOff[index]) {
 			DJError.handle({
 				if(val == true && track.notNil) {
-					cuePos = track.pos;
-					track.setCuePos(cuePos);
-				} {
-					cuePos = 0;
+					param[\cuePos] = track.pos;
+					track.setCuePos(param[\cuePos]+param[\fineTune]);
 				};
-				fineTune = 0;
 				ignoreOff[index] = false;
 			}, "Failed to set cue point");
 		} {
@@ -159,7 +157,11 @@ Deck {
 	}
 
 	fineTuneCue { arg val;
-		fineTune = val.clip(-64, 64);
+		val = val.clip(-64, 64);
+		param[\fineTune] = val;
+		if(track.notNil) {
+			track.setCuePos(param[\cuePos]+param[\fineTune]);
+		};
 	}
 
 	skipForward {
@@ -304,13 +306,13 @@ Deck {
 				};
 
 				if(isStopped) {
-					track.play(cuePos + fineTune);
+					track.play(param[\cuePos]+param[\fineTune]);
 					isStopped = false;
-					("Deck " ++ ref ++ " started").postln;
+					("Deck " ++ param[\ref] ++ " started").postln;
 				} {
 					track.stop;
 					isStopped = true;
-					("Deck " ++ ref ++ " stopped").postln;
+					("Deck " ++ param[\ref] ++ " stopped").postln;
 				};
 				ignoreOff[index] = false;
 			}, "Start/stop failed");
@@ -397,7 +399,7 @@ Deck {
 					\amp, param[\amp] ? 1,
 					\bus, bus,
 					\rate, track.param[\rate],
-					\deck, ref,
+					\deck, param[\ref],
 					\loop, 0
 				]);
 
